@@ -30,7 +30,7 @@ module Importing
       GrdaWarehouse::Tasks::ClientCleanup.new.run!
 
       # The sanity check should always be last
-      # It has the potential to run for a long time since it 
+      # It has the potential to run for a long time since it
       # self-heals the warehouse for anyone it finds that is broken
       # and then re-checks itself
       GrdaWarehouse::Tasks::SanityCheckServiceHistory.new(1000).run!

@@ -34,10 +34,10 @@ Rails.application.routes.draw do
     resources :service_after_exit, only: [:index]
     resources :entry_exit_service, only: [:index]
     resources :chronic, only: [:index] do
-      get :summary, on: :collection   
+      get :summary, on: :collection
     end
     resources :first_time_homeless, only: [:index] do
-      get :summary, on: :collection   
+      get :summary, on: :collection
     end
     resources :client_in_project_during_date_range, only: [:index]
     resources :bed_utilization, only: [:index]
@@ -121,7 +121,7 @@ Rails.application.routes.draw do
     resources :users, except: [:show, :new, :create] do
       resource :resend_invitation, only: :create
       resource :recreate_invitation, only: :create
-      resource :audit, only: :show 
+      resource :audit, only: :show
     end
     resources :roles
     namespace :dashboard do
@@ -130,6 +130,10 @@ Rails.application.routes.draw do
     end
   end
   resource :account, only: [:edit, :update]
+
+  namespace :public_api do
+    resources :clients_served, only: [:index]
+  end
 
   root 'root#index'
 end
