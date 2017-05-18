@@ -7,11 +7,11 @@ class App.Dashboards.Veterans.Housed
     Chart.defaults.global.elements.rectangle.borderColor = '#45789C'
     Chart.defaults.global.elements.rectangle.borderWidth = 1
 
-    # @data comes in as counts per day, we currently want to show counts 
+    # @data comes in as counts per day, we currently want to show counts
     # per month
     month_data = $.map @data, (value, index) ->
       # console.log value, index
-    data = 
+    data =
       labels: @labels,
       datasets: [
         {
@@ -20,10 +20,9 @@ class App.Dashboards.Veterans.Housed
           backgroundColor: '#45789C',
         }
       ]
-    
+
     housed_chart = new Chart @chart,
       type: 'bar',
       data: data,
-      options: 
+      options:
         bezierCurve: false,
-        

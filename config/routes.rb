@@ -131,8 +131,22 @@ Rails.application.routes.draw do
   end
   resource :account, only: [:edit, :update]
 
-  namespace :public_api do
-    resources :clients_served, only: [:index]
+  [:public_api, :public_dashboards].each do |route|
+    namespace route do
+      resources :clients_served, only: [:index]
+      namespace :th do
+        resources :time_to_exit, only: [:index]
+      end
+      namespace :ph do
+        resources :length_of_stay, only: [:index]
+      end
+      namespace :es do
+        resources :time_to_exit, only: [:index]
+      end
+      namespace :rrh do
+        resources :time_to_housing, only: [:index]
+      end
+    end
   end
 
   root 'root#index'

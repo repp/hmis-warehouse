@@ -1,0 +1,129 @@
+- content_for :title, 'Public Dashboards'
+%h1= content_for :title
+.row
+  .col-sm-4
+    .row
+      .info-box.clients-served.col-xs-12
+        %span.info-box-text Clients Served
+        .row.text-center
+          .col-xs-2
+            .info-box-icon
+              icon
+          .col-xs-10
+            .row
+              .previous-count.col-xs-6
+                .date-range
+                .count
+              .current-count.col-xs-6
+                .date-range
+                .count
+              .col-xs-12
+                .row
+                  .change.col-xs-12
+
+%canvas{:height => "100px", :id => "active-chart", :width => "300px"}
+%canvas{:height => "100px", :id => "chart2", :width => "300px"}
+
+/ Clients served display (1 and 13 months ago)
+-# .info-box
+-#   %span.info-box-icon.bg-yellow
+-#     %i.ion.ion-person-stalker
+-#   .info-box-content{:style => "text-align:center;"}
+-#     %span.info-box-text{:style => "text-align: left;"} Clients Served
+-#     .col-md-6.col-sm-6.col-xs-6{:style => "border-right: solid #ccc 1px;"}
+-#       Q
+-#       %span.past_quarter
+-#       %span.info-box-number{:style => "margin-top:-5px;"} 4726
+-#     .col-md-6.col-sm-6.col-xs-6
+-#       Q
+-#       %span.current_quarter
+-#       %span.info-box-number{:style => "margin-top:-5px;"} 4167
+-#     .col-md-12
+-#       %span.description-percentage.text-red
+-#         %i.fa.fa-caret-down
+-#         11.83%
+
+= content_for :page_js do
+  :javascript
+    (function($){
+      $.get('/public_api/clients_served', function (data) {
+          //date should be passed as a string of the form MM-YYYY
+          function formatDate(date) {
+            var monthNames = [
+              "January", "February", "March",
+              "April", "May", "June", "July",
+              "August", "September", "October",
+              "November", "December"
+            ];
+
+            var monthIndex = parseInt(date.substring(0, 2));
+            var year = date.substring(3, date.length)
+
+            return monthNames[monthIndex] + ' ' + year;
+          }
+        var dates = Object.keys(data);
+
+        var previous_date_range = dates[0];
+        var current_date_range = dates[1];
+
+        var previous_count = data[previous_date_range];
+        var current_count = data[current_date_range];
+
+        var change = current_count / previous_count * 100 - 100; //As a percent
+
+        $('.previous-count .date-range').text(formatDate(previous_date_range));
+        $('.previous-count .count').text(previous_count);
+
+        $('.current-count .date-range').text(formatDate(current_date_range));
+        $('.current-count .count').text(current_count);
+
+        if (change > 0){
+          $('.change').text("+" + change.toFixed(2) + "%");
+        }
+        else{
+          $('.change').text(change.toFixed(2) + "%");
+        }
+
+        var chart = $('#active-chart');
+        var myChart = new Chart(chart, {
+        type: 'bar',
+        data: {
+            labels: ["Red", "Blue", "Yellow", "Green", "Purple", "Orange"],
+            datasets: [{
+                label: '# of Votes',
+                data: [12, 19, 3, 5, 2, 3],
+                backgroundColor: [
+                    'rgba(255, 99, 132, 0.2)',
+                    'rgba(54, 162, 235, 0.2)',
+                    'rgba(255, 206, 86, 0.2)',
+                    'rgba(75, 192, 192, 0.2)',
+                    'rgba(153, 102, 255, 0.2)',
+                    'rgba(255, 159, 64, 0.2)'
+                ],
+                borderColor: [
+                    'rgba(255,99,132,1)',
+                    'rgba(54, 162, 235, 1)',
+                    'rgba(255, 206, 86, 1)',
+                    'rgba(75, 192, 192, 1)',
+                    'rgba(153, 102, 255, 1)',
+                    'rgba(255, 159, 64, 1)'
+                ],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            scales: {
+                yAxes: [{
+                    ticks: {
+                        beginAtZero:true
+                    }
+                }]
+            }
+        }
+      });
+
+      });
+
+      var chart2 = $('#chart2')
+      var housed_chart = new App.Dashboards.Veterans.Exits(chart2, [], []);
+    })(jQuery);

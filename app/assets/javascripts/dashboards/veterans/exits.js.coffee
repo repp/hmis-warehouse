@@ -8,23 +8,22 @@ class App.Dashboards.Veterans.Exits
     Chart.defaults.global.elements.rectangle.borderWidth = 1
 
 
-    data = 
+    data =
       labels: (v for k, v of @labels),
       datasets: (v for k, v of @data),
-
     exits_chart = new Chart @chart,
       type: 'bar',
       data: data,
-      options: 
+      options:
         bezierCurve: false,
-        scales: 
+        scales:
           xAxes: [
             stacked: true
           ],
           yAxes: [
             stacked: true
           ]
-        legend: 
+        legend:
           fullWidth: true,
           position: 'right'
         tooltips:

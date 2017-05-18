@@ -19,7 +19,7 @@ module PublicApi
           ).select(:client_id).distinct.count
 
       respond_to do |format|
-        format.html do
+        format.json do
           render json: clients_served
         end
       end
