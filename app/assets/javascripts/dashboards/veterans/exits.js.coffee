@@ -7,7 +7,6 @@ class App.Dashboards.Veterans.Exits
     Chart.defaults.global.elements.rectangle.borderColor = '#45789C'
     Chart.defaults.global.elements.rectangle.borderWidth = 1
 
-
     data =
       labels: (v for k, v of @labels),
       datasets: (v for k, v of @data),

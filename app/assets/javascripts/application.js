@@ -38,5 +38,10 @@
 //= require_directory ./charts_scatter_by_date
 //= require_directory ./dashboards
 //= require_directory ./dashboards/veterans
+//= require_directory ./public_dashboards
+//= require_directory ./public_dashboards/es
+//= require_directory ./public_dashboards/rrh
+//= require_directory ./public_dashboards/ph
+//= require_directory ./public_dashboards/th
 
 //= require init

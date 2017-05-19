@@ -1,0 +1,11 @@
+- content_for :title, 'Emergency Shelter Time to Exit'
+%h1= content_for :title
+
+= render 'time_to_exit'
+
+= content_for :page_js do
+  :javascript
+    (function($){
+        var chart = $('#time-to-exit-chart');
+        var time_to_exit_chart = new App.PublicDashboards.Es.TimeToExit(chart, '/public_api/es/time_to_exit');
+    })(jQuery);

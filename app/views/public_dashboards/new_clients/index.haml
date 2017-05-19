@@ -1,10 +1,10 @@
-- content_for :title, 'Clients Served'
+- content_for :title, 'New Clients'
 %h1= content_for :title
 .row
   .col-sm-4
     .row
-      .info-box.clients-served.col-xs-12
-        %span.info-box-text Clients Served
+      .info-box.new_clients.col-xs-12
+        %span.info-box-text New Clients
         .row.text-center
           .col-xs-2
             .info-box-icon
@@ -24,7 +24,7 @@
 = content_for :page_js do
   :javascript
     (function($){
-      $.get('/public_api/clients_served', function (data) {
+      $.get('/public_api/new_clients', function (data) {
         var dates = Object.keys(data);
 
         var previous_date_range = dates[0];

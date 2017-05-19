@@ -1,4 +1,4 @@
-module PublicDashboards::rrh
+module PublicDashboards::Rrh
   class TimeToHousingController < ApplicationController
     def index
     end

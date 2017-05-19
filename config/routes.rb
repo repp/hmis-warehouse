@@ -134,6 +134,7 @@ Rails.application.routes.draw do
   [:public_api, :public_dashboards].each do |route|
     namespace route do
       resources :clients_served, only: [:index]
+      resources :new_clients, only: [:index]
       namespace :th do
         resources :time_to_exit, only: [:index]
       end
@@ -145,6 +146,9 @@ Rails.application.routes.draw do
       end
       namespace :rrh do
         resources :time_to_housing, only: [:index]
+      end
+      namespace :pit do
+        resources :sheltered_homeless_count, only: [:index]
       end
     end
   end

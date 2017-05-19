@@ -1,4 +1,4 @@
-module PublicDashboards::es
+module PublicDashboards::Es
   class TimeToExitController < ApplicationController
     def index
     end

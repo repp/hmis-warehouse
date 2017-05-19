@@ -1,0 +1,11 @@
+- content_for :title, 'One Day Sheltered Homeless Count'
+%h1= content_for :title
+
+= render 'sheltered_homeless_count'
+
+= content_for :page_js do
+  :javascript
+    (function($){
+        var chart = $('#sheltered_homeless_count-chart');
+        var time_to_exit_chart = new App.PublicDashboards.Pit.ShelteredHomelessCount(chart, '/public_api/pit/sheltered_homeless_count');
+    })(jQuery);
