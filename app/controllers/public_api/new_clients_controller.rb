@@ -2,6 +2,7 @@ module PublicApi
   class NewClientsController < ApplicationController
     # New clients (first time homeless) for public dashboard
     def index
+      #TODO Filtering by project_type
       new_clients = {}
 
       #New clients a year ago
@@ -13,14 +14,6 @@ module PublicApi
 
       @clients = @clients.entered_in_range(@range.range)
 
-      #TODO Filtering by project_type
-      # @project_types = params.try(:[], :first_time_homeless).try(:[], :project_types) || []
-      # @project_types.reject!(&:empty?)
-      # if @project_types.any?
-      #   @project_types.map!(&:to_i)
-      #   @clients = @clients.where(history.table_name => {project_type: @project_types})
-      # end
-
       new_clients[start_date.to_time.strftime('%b %Y')] = @clients.select(:id).distinct.count
 
       #New clients last month
@@ -31,13 +24,6 @@ module PublicApi
       @clients = client_source
 
       @clients = @clients.entered_in_range(@range.range)
-
-      # @project_types = params.try(:[], :first_time_homeless).try(:[], :project_types) || []
-      # @project_types.reject!(&:empty?)
-      # if @project_types.any?
-      #   @project_types.map!(&:to_i)
-      #   @clients = @clients.where(history.table_name => {project_type: @project_types})
-      # end
 
       new_clients[start_date.to_time.strftime('%b %Y')] = @clients.select(:id).distinct.count
 

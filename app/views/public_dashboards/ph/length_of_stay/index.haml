@@ -1,0 +1,11 @@
+- content_for :title, 'Permanent Housing Length of Stay'
+%h2= content_for :title
+
+= render 'length_of_stay'
+
+= content_for :page_js do
+  :javascript
+    (function($){
+        var chart = $('#length-of-stay-chart');
+        var time_to_exit_chart = new App.PublicDashboards.Ph.LengthOfStay(chart, '/public_api/ph/length_of_stay');
+    })(jQuery);

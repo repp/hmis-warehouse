@@ -1,0 +1,88 @@
+= content_for :page_js do
+  :javascript
+    (function($) {
+      var error_message = function (response, status, xhr, target) {
+        var message = "Loading failed: " + xhr.status + ' ' + xhr.statusText;
+        var $error = $(document.createElement('div'));
+        $error.text(message).addClass('alert').addClass('alert-danger')
+        $(target).html($error);
+      };
+
+      $('.jRemoteClientsServed').load('#{public_dashboards_clients_served_index_path()}', function(response, status, xhr) {
+        if (status == 'error') {
+          error_message(response, status, xhr, this)
+        }
+        else {
+          $.get('/public_api/clients_served', function (data) {
+            var clients_served = new App.PublicDashboards.ClientsServed.ClientsServed('.jRemoteClientsServed', data);
+          });
+        }
+      });
+      $('.jRemoteNewClients').load('#{public_dashboards_new_clients_path()}', function(response, status, xhr) {
+        if (status == 'error') {
+          error_message(response, status, xhr, this)
+        }
+        else {
+          $.get('/public_api/new_clients', function (data) {
+            var new_clients = new App.PublicDashboards.NewClients.NewClients('.jRemoteNewClients', data);
+          });
+        }
+      });
+
+      $('.jRemoteShelteredCount').load('#{public_dashboards_pit_sheltered_homeless_count_index_path()}', function(response, status, xhr) {
+        if (status == 'error') {
+          error_message(response, status, xhr, this)
+        }
+        else {
+          $.get('/public_api/pit/sheltered_homeless_count', function (data) {
+            var chart = $('#sheltered-homeless-count-chart');
+            var time_to_exit_chart = new App.PublicDashboards.Pit.ShelteredHomelessCount(chart, '/public_api/pit/sheltered_homeless_count');
+          });
+        }
+      });
+      
+      $('.jRemotePermanentHousing').load('#{public_dashboards_ph_length_of_stay_index_path()}', function(response, status, xhr) {
+        if (status == 'error') {
+          error_message(response, status, xhr, this)
+        }
+        else {
+          $.get('/public_api/ph/length_of_stay', function (data) {
+            var chart = $('#length-of-stay-chart');
+            var time_to_exit_chart = new App.PublicDashboards.Ph.LengthOfStay(chart, '/public_api/ph/length_of_stay');
+          });
+        }
+      });
+      $('.jRemoteTransitionalHousing').load('#{public_dashboards_th_time_to_exit_index_path()}', function(response, status, xhr) {
+        if (status == 'error') {
+          error_message(response, status, xhr, this)
+        }
+        else {
+          $.get('/public_api/th/time_to_exit', function (data) {
+            var chart = $('#time-to-exit-chart');
+            var time_to_exit_chart = new App.PublicDashboards.Th.TimeToExit(chart, '/public_api/th/time_to_exit');
+          });
+        }
+      });
+      $('.jRemoteEmergencyShelter').load('#{public_dashboards_es_time_to_exit_index_path()}', function(response, status, xhr) {
+        if (status == 'error') {
+          error_message(response, status, xhr, this)
+        }
+        else {
+          $.get('/public_api/es/time_to_exit', function (data) {
+            var chart = $('#es-time-to-exit-chart');
+            var time_to_exit_chart = new App.PublicDashboards.Es.TimeToExit(chart, '/public_api/es/time_to_exit');
+          });
+        }
+      });
+      $('.jRemoteRapidRehousing').load('#{public_dashboards_rrh_time_to_housing_index_path()}', function(response, status, xhr) {
+        if (status == 'error') {
+          error_message(response, status, xhr, this)
+        }
+        else {
+          $.get('/public_api/es/time_to_exit', function (data) {
+            var chart = $('#time-to-housing-chart');
+            var time_to_exit_chart = new App.PublicDashboards.Rrh.TimeToHousing(chart, '/public_api/rrh/time_to_housing');
+          });
+        }
+      });
+    })(jQuery);

@@ -1,13 +1,13 @@
 #= require ./namespace
 
-class App.PublicDashboards.Es.TimeToExit
+class App.PublicDashboards.Th.TimeToExit
   constructor: (@chart, @url) ->
     @fetch_data()
 
   fetch_data: =>
     $.get @url, (return_data) =>
       if return_data.length == 0
-        @chart.before('<p class="alert alert-danger">No data found</p>')
+        @chart.before('<p class="alert alert-warning">No data found</p>')
 
       else
         #Loop over all datasets in return_data

@@ -43,5 +43,8 @@
 //= require_directory ./public_dashboards/rrh
 //= require_directory ./public_dashboards/ph
 //= require_directory ./public_dashboards/th
+//= require_directory ./public_dashboards/pit
+//= require_directory ./public_dashboards/clients_served
+//= require_directory ./public_dashboards/new_clients
 
 //= require init

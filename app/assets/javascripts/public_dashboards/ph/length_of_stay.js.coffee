@@ -1,13 +1,13 @@
 #= require ./namespace
 
-class App.PublicDashboards.Es.TimeToExit
+class App.PublicDashboards.Ph.LengthOfStay
   constructor: (@chart, @url) ->
     @fetch_data()
 
   fetch_data: =>
     $.get @url, (return_data) =>
       if return_data.length == 0
-        @chart.before('<p class="alert alert-danger">No data found</p>')
+        @chart.before('<p class="alert alert-warning">No data found</p>')
 
       else
         #Loop over all datasets in return_data
@@ -51,7 +51,7 @@ class App.PublicDashboards.Es.TimeToExit
             text = data.datasets[tooltipItem.datasetIndex].label + ": " + value + (if value is 1 then " Day" else " Days")
 
   show_chart: =>
-    time_to_exit_chart = new Chart @chart,
+    length_of_stay_chart = new Chart @chart,
       type: 'line'
       data: @data
       options: @options

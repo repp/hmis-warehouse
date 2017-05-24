@@ -1,0 +1,11 @@
+- content_for :title, 'Rapid Re-Housing Time to Housing'
+%h2= content_for :title
+
+= render 'time_to_housing'
+
+= content_for :page_js do
+  :javascript
+    (function($){
+        var chart = $('#time-to-housing-chart');
+        var time_to_exit_chart = new App.PublicDashboards.Es.TimeToExit(chart, '/public_api/rrh/time_to_housing');
+    })(jQuery);

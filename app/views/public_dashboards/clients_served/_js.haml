@@ -1,0 +1,28 @@
+= content_for :page_js do
+  :javascript
+    (function($){
+      $.get('/public_api/clients_served', function (data) {
+        var dates = Object.keys(data);
+
+        var previous_date_range = dates[0];
+        var current_date_range = dates[1];
+
+        var previous_count = data[previous_date_range];
+        var current_count = data[current_date_range];
+
+        var change = current_count / previous_count * 100 - 100; //As a percent
+
+        $('.previous-count .date-range').text(previous_date_range);
+        $('.previous-count .count').text(previous_count);
+
+        $('.current-count .date-range').text(current_date_range);
+        $('.current-count .count').text(current_count);
+
+        if (change > 0){
+          $('.change').text("+" + change.toFixed(2) + "%");
+        }
+        else{
+          $('.change').text(change.toFixed(2) + "%");
+        }
+      });
+    })(jQuery);
