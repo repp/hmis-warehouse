@@ -7,5 +7,5 @@
   :javascript
     (function($){
         var chart = $('#sheltered-homeless-count-chart');
-        var time_to_exit_chart = new App.PublicDashboards.Pit.ShelteredHomelessCount(chart, '/public_api/pit/sheltered_homeless_count');
+        var time_to_exit_chart = new App.PublicDashboards.Pit.ShelteredHomelessCount(chart, '#{public_api_pit_sheltered_homeless_count_index_path}');
     })(jQuery);

@@ -1,7 +1,7 @@
 module PublicApi::Pit
   class ShelteredHomelessCountController < PublicController
     CACHE_EXPIRY = if Rails.env.production? then 8.hours else 2.minutes end
-    ON_DATE = '2017-01-27'
+    ON_DATE = '2017-01-25'
 
     #One day count of all sheltered homeless on a specific date (1/25/2017)
     def index

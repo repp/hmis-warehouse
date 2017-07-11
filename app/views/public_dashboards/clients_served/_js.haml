@@ -1,7 +1,7 @@
 = content_for :page_js do
   :javascript
     (function($){
-      $.get('/public_api/clients_served', function (data) {
+      $.get('#{public_api_clients_served_index_path}', function (data) {
         var dates = Object.keys(data);
 
         var previous_date_range = dates[0];
