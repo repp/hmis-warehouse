@@ -1,5 +1,5 @@
 module PublicDashboards::Rrh
-  class TimeToHousingController < ApplicationController
+  class TimeToHousingController < PublicController
     def index
       render layout: ! request.xhr?
     end

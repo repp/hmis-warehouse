@@ -13,7 +13,7 @@
           error_message(response, status, xhr, this)
         }
         else {
-          $.get('/public_api/clients_served', function (data) {
+          $.get('#{public_api_clients_served_index_path}', function (data) {
             var clients_served = new App.PublicDashboards.ClientsServed.ClientsServed('.jRemoteClientsServed', data);
           });
         }
@@ -23,7 +23,7 @@
           error_message(response, status, xhr, this)
         }
         else {
-          $.get('/public_api/new_clients', function (data) {
+          $.get('#{public_api_new_clients_path}', function (data) {
             var new_clients = new App.PublicDashboards.NewClients.NewClients('.jRemoteNewClients', data);
           });
         }
@@ -34,9 +34,9 @@
           error_message(response, status, xhr, this)
         }
         else {
-          $.get('/public_api/pit/sheltered_homeless_count', function (data) {
+          $.get('#{public_api_pit_sheltered_homeless_count_index_path}', function (data) {
             var chart = $('#sheltered-homeless-count-chart');
-            var time_to_exit_chart = new App.PublicDashboards.Pit.ShelteredHomelessCount(chart, '/public_api/pit/sheltered_homeless_count');
+            var time_to_exit_chart = new App.PublicDashboards.Pit.ShelteredHomelessCount(chart, '#{public_api_pit_sheltered_homeless_count_index_path}');
           });
         }
       });
@@ -46,9 +46,9 @@
           error_message(response, status, xhr, this)
         }
         else {
-          $.get('/public_api/ph/length_of_stay', function (data) {
+          $.get('#{public_api_ph_length_of_stay_index_path}', function (data) {
             var chart = $('#length-of-stay-chart');
-            var time_to_exit_chart = new App.PublicDashboards.Ph.LengthOfStay(chart, '/public_api/ph/length_of_stay');
+            var time_to_exit_chart = new App.PublicDashboards.Ph.LengthOfStay(chart, '#{public_api_ph_length_of_stay_index_path}');
           });
         }
       });
@@ -57,9 +57,9 @@
           error_message(response, status, xhr, this)
         }
         else {
-          $.get('/public_api/th/time_to_exit', function (data) {
+          $.get('#{public_api_th_time_to_exit_index_path}', function (data) {
             var chart = $('#time-to-exit-chart');
-            var time_to_exit_chart = new App.PublicDashboards.Th.TimeToExit(chart, '/public_api/th/time_to_exit');
+            var time_to_exit_chart = new App.PublicDashboards.Th.TimeToExit(chart, '#{public_api_th_time_to_exit_index_path}');
           });
         }
       });
@@ -68,9 +68,9 @@
           error_message(response, status, xhr, this)
         }
         else {
-          $.get('/public_api/es/time_to_exit', function (data) {
+          $.get('#{public_api_es_time_to_exit_index_path}', function (data) {
             var chart = $('#es-time-to-exit-chart');
-            var time_to_exit_chart = new App.PublicDashboards.Es.TimeToExit(chart, '/public_api/es/time_to_exit');
+            var time_to_exit_chart = new App.PublicDashboards.Es.TimeToExit(chart, '#{public_api_es_time_to_exit_index_path}');
           });
         }
       });
@@ -79,9 +79,9 @@
           error_message(response, status, xhr, this)
         }
         else {
-          $.get('/public_api/es/time_to_exit', function (data) {
+          $.get('#{public_api_rrh_time_to_housing_index_path}', function (data) {
             var chart = $('#time-to-housing-chart');
-            var time_to_exit_chart = new App.PublicDashboards.Rrh.TimeToHousing(chart, '/public_api/rrh/time_to_housing');
+            var time_to_exit_chart = new App.PublicDashboards.Rrh.TimeToHousing(chart, '#{public_api_rrh_time_to_housing_index_path}');
           });
         }
       });

@@ -1,5 +1,5 @@
 module PublicApi::Es
-  class TimeToExitController < ApplicationController
+  class TimeToExitController < PublicController
     def index
       times_to_exit = [{title: "My first dataset", data: {
         "Jan 2016": 2, "Feb 2016": 43, "Mar 2016": 13, "April 2016": 25, "May 2016": 30,

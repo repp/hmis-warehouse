@@ -1,5 +1,5 @@
 module PublicApi
-  class NewClientsController < ApplicationController
+  class NewClientsController < PublicController
     # New clients (first time homeless) for public dashboard
     def index
       #TODO Filtering by project_type

@@ -1,5 +1,5 @@
 module PublicApi
-  class ClientsServedController < ApplicationController
+  class ClientsServedController < PublicController
     #Clients served for public dashboard
     def index
       clients_served = {}

@@ -1,5 +1,5 @@
 module PublicDashboards::Th
-  class TimeToExitController < ApplicationController
+  class TimeToExitController < PublicController
     def index
       render layout: ! request.xhr?
     end

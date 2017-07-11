@@ -1,5 +1,5 @@
 module PublicDashboards
-  class ClientsServedController < ApplicationController
+  class ClientsServedController < PublicController
     #Clients served for public dashboard
     def index
       render layout: ! request.xhr?

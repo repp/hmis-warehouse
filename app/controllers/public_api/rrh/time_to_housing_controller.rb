@@ -1,5 +1,5 @@
 module PublicApi::Rrh
-  class TimeToHousingController < ApplicationController
+  class TimeToHousingController < PublicController
     def index
       data = [{title: "My first dataset", data: {
         "Jan 2016": 2, "Feb 2016": 43, "Mar 2016": 13, "April 2016": 25, "May 2016": 30,

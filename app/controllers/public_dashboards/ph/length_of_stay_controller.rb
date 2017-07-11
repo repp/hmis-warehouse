@@ -1,5 +1,5 @@
 module PublicDashboards::Ph
-  class LengthOfStayController < ApplicationController
+  class LengthOfStayController < PublicController
     def index
       render layout: ! request.xhr?
     end
