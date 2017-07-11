@@ -3,7 +3,7 @@ module GrdaWarehouse
     belongs_to :source_client, class_name: 'GrdaWarehouse::Hud::Client'
     belongs_to :destination_client, class_name: 'GrdaWarehouse::Hud::Client'
     belongs_to :updated_by, class_name: 'User'
-    serialize :score_details, JSON
+    serialize :score_details, Hash
     validates :status, inclusion: {in: ['candidate', 'accepted', 'rejected', 'processed_sources']}
 
     def self.create_candidates!(client, threshold:, metrics:)
@@ -59,10 +59,12 @@ module GrdaWarehouse
       fields = Array(fields).map(&:to_s)
       weight_sum = 0.0;
       score_sum = 0.0;
-      score_details['metrics_with_scores'].each do |detail|
-        if detail['field'].in? fields
-          weight_sum += detail['weight']
-          score_sum += detail['score']
+      if score_details['metrics_with_scores'].present?
+        score_details['metrics_with_scores'].each do |detail|
+          if detail['field'].in? fields
+            weight_sum += detail['weight']
+            score_sum += detail['score']
+          end
         end
       end
       return nil if weight_sum.zero?

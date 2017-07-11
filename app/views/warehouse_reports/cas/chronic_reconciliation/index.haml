@@ -1,0 +1,78 @@
+- title = 'Chronic Reconcilliation Report'
+- content_for :title, title
+%h1= content_for :title
+= render '/warehouse_reports/breadcrumbs', tab: 'cas-reports'
+= simple_form_for @filter, as: :filter, url: warehouse_reports_cas_chronic_reconciliation_index_path, method: :get do |f|
+  .row
+    .col-sm-3
+      = f.input :date, collection: @filter.chronic_days, label: 'Chronic date',input_html: {class: 'select2'}
+    .col-sm-3
+      = f.input :homeless_service_after, as: :date_picker
+    .col-sm-3
+      = button_tag('Update View', class: 'btn btn-primary')
+.row
+  .col-sm-6
+    %h3
+      Chronic Clients with 365 Days on 
+      = @date
+      Not Flagged for CAS
+      = "(#{@missing_in_cas.count})"
+    %table.table.table-condensed
+      %thead
+        %tr
+          %th Client
+          %th Days
+          %th Months
+          %th Trigger
+      %tbody
+        - @missing_in_cas.each do |client|
+          %tr
+            %td
+              = link_to(client_path(client[:client_id])) do 
+                = client[:first_name]
+                = client[:last_name]
+            %td
+              = client[:days]
+            %td
+              = client[:months]
+            %td
+              = client[:trigger]
+  .col-sm-6
+    %h3
+      Clients Flagged for CAS, Not in Chronic List with more than 365 days from
+      = @date
+      = "(#{@not_on_list.count})"
+    %table.table.table-condensed
+      %thead
+        %tr
+          %th
+          %th Client
+          %th Days
+          %th Months
+          %th Trigger
+      %tbody
+        - @not_on_list.each do |client|
+          %tr.jClient
+            %td
+              = link_to 'Remove', cas_active_path(id: client[:id]), method: :patch, remote: true, class: 'btn btn-sm btn-secondary jRemoveCasActive'
+            %td
+              = link_to(client_path(client[:id])) do 
+                = client[:FirstName]
+                = client[:LastName]
+            %td
+              = client.chronics.find_by_date(@date)&.days_in_last_three_years
+            %td
+              = client.chronics.find_by_date(@date)&.months_in_last_three_years
+            %td
+              = client.chronics.find_by_date(@date)&.trigger
+
+= content_for :page_js do 
+  :javascript
+    console.log('test');
+    $(document).on('ajax:success', '.jRemoveCasActive', function(evt, data, status, xhr){
+      $(evt.currentTarget).closest('.jClient').fadeOut();
+    }).on('ajax:error', '.jRemoveCasActive', function(evt, data, status, xhr){
+      $(evt.currentTarget).text('Remove Failed').
+        removeClass('btn-secondary').
+        addClass('btn-danger');
+    });

@@ -1,10 +1,45 @@
 Rails.application.routes.draw do
+  match "/404", to: "errors#not_found", via: :all
+  match "/422", to: "errors#unacceptable", via: :all
+  match "/500", to: "errors#internal_server_error", via: :all
+
+  mount LetsencryptPlugin::Engine, at: '/'
   class OnlyXhrRequest
     def matches?(request)
       request.xhr?
     end
   end
-  devise_for :users, controllers: { invitations: 'users/invitations'}
+  devise_for :users, controllers: { invitations: 'users/invitations', sessions: 'users/sessions'}
+  devise_scope :user do
+    match 'active' => 'users/sessions#active', via: :get
+    match 'timeout' => 'users/sessions#timeout', via: :get
+  end  
+
+  def healthcare_routes
+    namespace :health do
+      resources :patient, only: [:index]
+      resources :utilization, only: [:index]
+      resources :appointments, only: [:index]
+      resources :medications, only: [:index]
+      resources :problems, only: [:index]
+      resource :careplan, except: [:destroy] do
+        get :self_sufficiency_assessment
+        get :print
+      end
+      namespace :careplan do
+        resources :goals do
+          post :sort, on: :collection
+          resources :previous, only: [:index, :show]
+        end
+        namespace :team do
+          resources :members, only: [:index, :create, :destroy, :new] do
+            get :previous, on: :collection
+            post :restore
+          end
+        end
+      end
+    end
+  end
 
   resources :reports do
     resources :report_results, path: 'results', only: [:index, :show, :create, :update, :destroy] do
@@ -48,12 +83,35 @@ Rails.application.routes.draw do
     end
     resources :missing_values, only: [:index]
     resources :active_veterans, only: [:index]
+    namespace :veteran_details do
+      resources :exits, only: [:index]
+      resources :entries, only: [:index]
+      resources :actives, only: [:index]
+    end
     resources :open_enrollments_no_service, only: [:index]
     resources :manage_cas_flags, only: [:index] do
       post :bulk_update, on: :collection
     end
     resources :find_by_id, only: [:index] do
       post :search, on: :collection
+    end
+    namespace :project do
+      resource :data_quality do
+        get :download, on: :member
+      end
+    end
+    namespace :cas do
+      resources :decision_efficiency, only: [:index] do
+        collection do
+          get :chart
+        end
+      end
+      resources :decline_reason, only: [:index]
+      resources :chronic_reconciliation, only: [:index] do
+        collection do
+          patch :update
+        end
+      end
     end
   end
 
@@ -72,20 +130,34 @@ Rails.application.routes.draw do
       get :chronic_days
       patch :merge
       patch :unmerge
+      post :create_note
+      resource :cas_active, only: :update
     end
+    
+    healthcare_routes()
+  end
+  namespace :clients do
+    resources :notes, only: [:destroy]
   end
 
   namespace :window do
     resources :clients, only: [:index, :show] do
       resources :print, only: [:index]
-      resources :health, only: [:index]
-      resources :youth, only: [:index]
+      healthcare_routes()
+      get :rollup
+      get :assessment
+      get :image
     end
   end
 
   resources :censuses, only: [:index] do
     get :date_range, on: :collection
     get :details, on: :collection
+  end
+  namespace :census do
+    resources :project_types, only: [:index] do
+      get :json, on: :collection
+    end
   end
   resources :dashboards, only: [:index]
   namespace :dashboards do
@@ -112,9 +184,33 @@ Rails.application.routes.draw do
     resources :uploads, except: [:update, :destroy, :edit]
   end
 
-  resources :organizations, only: [:index, :show]
-  resources :projects, only: [:index, :show]
+  resources :organizations, only: [:index, :show] do
+    resources :contacts, except: [:show], controller: 'organizations/contacts'
+  end
+  resources :projects, only: [:index, :show] do
+    resources :contacts, except: [:show], controller: 'projects/contacts'
+    resources :data_quality_reports, only: [:index, :show] do
+      get :support, on: :member
+    end
+  end
+
+  resources :project_groups, except: [:destroy, :show] do
+    resources :contacts, except: [:show], controller: 'project_groups/contacts'
+    resources :data_quality_reports, only: [:index, :show], controller: 'data_quality_reports_project_group' do
+      get :support, on: :member
+    end
+  end
+  
   resources :weather, only: [:index]
+
+  resources :notifications, only: [:show] do
+    resources :projects, only: [:show] do
+      resources :data_quality_reports, only: [:show]
+    end
+    resources :project_groups, only: [:show] do
+      resources :data_quality_reports, only: [:show], controller: 'data_quality_reports_project_group'
+    end
+  end
 
   namespace :admin do
     # resolves route clash w/ devise
@@ -128,8 +224,34 @@ Rails.application.routes.draw do
       resources :imports, only: [:index]
       resources :debug, only: [:index]
     end
+    namespace :health do
+      resources :admin, only: [:index]
+      resources :patients, only: [:index] do
+        post :update, on: :collection
+      end
+      resources :users, only: [:index] do
+        post :update, on: :collection
+      end
+      resources :roles, only: [:index]
+    end
+    resources :translation_keys, only: [:index, :update]
+    resources :translation_text, only: [:update]
+    
+    namespace :eto_api do
+      resources :assessments, only: [:index, :update]
+    end
   end
   resource :account, only: [:edit, :update]
+  
+  unless Rails.env.production?
+    resource :style_guide, only: :none do
+      get :careplan
+      get :health_team
+      get :icon_font
+      get :add_goal
+      get :add_team_member
+    end
+  end
 
   [:public_api, :public_dashboards].each do |route|
     namespace route do
@@ -151,6 +273,10 @@ Rails.application.routes.draw do
         resources :sheltered_homeless_count, only: [:index]
       end
     end
+  end
+
+  namespace :system_status do
+    get :operational
   end
 
   root 'root#index'

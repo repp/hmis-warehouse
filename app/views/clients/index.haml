@@ -15,7 +15,7 @@
       %p
         = link_to client_matches_path, class: 'btn btn-secondary' do
           %span.icon-shrink2
-          Process Duplicates
+          = _('Process Duplicates')
 .row.table-utilities
   .col-sm-4
     %p= page_entries_info @clients
@@ -91,8 +91,6 @@
             = client.processed_service_history.try(:first_date_served)
             and
             =client.processed_service_history.try(:last_date_served)
-          - if client.chronic?
-            .clients__chronic
-              Chronically Homeless
+          = render 'chronic_flags', client: client
         
 %p= paginate @clients, params: {sort: @column, direction: @direction}

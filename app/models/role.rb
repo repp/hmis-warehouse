@@ -4,11 +4,20 @@ class Role < ActiveRecord::Base
   validates :name, presence: true
   
   def role_name
-    name.to_s.humanize.gsub 'Dnd', 'DND'
+    name.to_s.humanize.gsub('Dnd', 'DND')
   end
 
-  def self.permissions
-    [
+  scope :health, -> do
+    where(health_role: true)
+  end
+
+  scope :editable, -> do
+    where(health_role: false)
+  end
+
+
+  def self.permissions(exclude_health: false)
+    perms = [
       :can_view_clients,
       :can_edit_clients,
       :can_view_reports,
@@ -22,9 +31,26 @@ class Role < ActiveRecord::Base
       :can_view_imports,
       :can_edit_roles,
       :can_view_projects,
+      :can_edit_projects,
+      :can_edit_project_groups,
       :can_view_organizations,
+      :can_edit_organizations,
+      :can_edit_data_sources,
       :can_view_client_window,
       :can_upload_hud_zips,
+      :can_edit_translations,
+      :can_manage_assessments,
+      :can_edit_anything_super_user,
+    ] 
+    perms += self.health_permissions unless exclude_health
+    return perms
+  end
+
+  def self.health_permissions
+    [
+      :can_administer_health,
+      :can_edit_client_health,
+      :can_view_client_health,
     ]
   end
 

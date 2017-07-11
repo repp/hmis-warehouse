@@ -1,0 +1,80 @@
+- content_for :title, _("Warehouse Reports")
+%h1= content_for :title
+
+= render 'breadcrumbs'
+= simple_form_for :project_data_quality, url: warehouse_reports_project_data_quality_path() do |f|
+  %table.table.table-condensed
+    %thead
+      %tr
+        %th{style: 'width: 2em;'}
+        %th{style: 'width: 20em;', colspan: 2}
+          Organization
+        %th{colspan: 2}
+          Select
+        %th{colspan: 2}
+          Contacts
+        - @projects.each do |(data_source, organization), projects|
+          = render 'organization', f: f, data_source: data_source, organization: organization, projects: projects
+        - if @project_groups.any?
+          %tr.jOrganization{data: {organization_id: :project_groups}}
+            %td.jToggle.closed
+              ▶︎
+            %td{style: 'width: 4em;'}
+            %td{style: 'width: 16em;'}
+              Project Groups
+            %td= check_box_tag("organization-toggle[project_groups]", 1, false, {class: 'jSelectAll', data: {organization_id: :project_groups}})
+            %td
+            %td{colspan: 2}
+          %tr.jProject.hidden{data: {organization_id: :project_groups}}
+            %th
+            %th
+            %th
+              Group
+            %th
+              Select
+            %th
+              Report
+            %th
+              Last Run
+            %th
+              Contacts
+            %th
+              Last Sent On
+          - @project_groups.each do |group|
+            = render 'project_group', f: f, group: group, projects: group.projects
+
+        
+  = render 'actions', f: f
+
+= content_for :page_js do
+  :javascript
+    (function($) {
+      var updateToggles = function() {
+        $('.jToggle').html('▼');
+        $('.jToggle.closed').html('▶︎');
+      }
+      updateToggles();
+      
+      $('.jToggle').on('click', function(e){
+        $(this).toggleClass('closed');
+        org_id = $(this).closest('.jOrganization').data('organizationId');
+        $(".jProject[data-organization-id='" + org_id + "']").toggleClass('hidden');
+
+        updateToggles();
+      });
+
+      $('.jSelectAll').on('click', function(e){
+        checked = $(this).is(':checked');
+        org_id = $(this).closest('.jOrganization').data('organizationId');
+        $(".jProject[data-organization-id='" + org_id + "']").find('jProjectSelect').attr('checked', checked);
+        $(".jProject[data-organization-id='" + org_id + "']").find('.jProjectSelect').attr('checked', checked);
+        if (checked) {
+          $(this).closest('.jOrganization').children('.closed').removeClass('closed');
+          $(".jProject[data-organization-id='" + org_id + "']").removeClass('hidden');
+          updateToggles();
+
+        }
+      });
+
+      
+    })(jQuery);

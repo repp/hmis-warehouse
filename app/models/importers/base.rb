@@ -226,8 +226,9 @@ module Importers
               h_key = row[@hud_key]
               # logger.info "Looking at: #{h_key} #{@klass}"
               # logger.info NewRelic::Agent::Samplers::MemorySampler.new.sampler.get_sample
-              # puts "#{h_key} comparing row: #{row[:DateUpdated]} exist: #{@existing[h_key].present?} prev: #{@previously_deleted[h_key].present?}"
-              # puts row.inspect
+              # logger.info "#{h_key} comparing row: #{row[:DateUpdated]} exist: #{@existing[h_key].present?} prev: #{@previously_deleted[h_key].present?}"
+              # logger.info row.inspect
+              # logger.info @existing[h_key].inspect
               if seen_before(h_key: h_key)
                 if newly_updated(h_key: h_key, row: row) || @previously_deleted[h_key].present?
                   @to_update << row
@@ -410,7 +411,8 @@ module Importers
 
 
     def gather_file_metadata(row)
-      @headers = row
+      expected_headers = @klass.hud_csv_headers().map{|h| [h.downcase, h]}.to_h
+      @headers = row.map{|h| expected_headers[h.downcase]} # normalize header case
       # figure out the locations of DateCreated, DateUpdate, DateDeleted
       # this is way faster than array#zip every time
       @date_created_index = @headers.index('DateCreated')

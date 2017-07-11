@@ -40,7 +40,7 @@ Rails.application.configure do
 
   # Raises error for missing translations
   # config.action_view.raise_on_missing_translations = true
- 
+
   # Devise requires a default URL
   config.action_mailer.default_url_options = { host: ENV['HOSTNAME'], port: ENV['PORT'] }
 
@@ -51,6 +51,9 @@ Rails.application.configure do
   config.lograge.enabled = false
 
   config.force_ssl = false
+
+  config.cache_store = :redis_store, Rails.application.config_for(:cache_store), { expires_in: 8.hours }
+  config.action_controller.perform_caching = true
 
   # config.middleware.use ExceptionNotification::Rack,
   #   :slack => {

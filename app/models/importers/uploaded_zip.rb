@@ -8,6 +8,7 @@ require 'csv'
 require 'charlock_holmes'
 require 'faker'
 require 'newrelic_rpm'
+require 'fileutils'
 # require 'temping'
 # Work around a faker bug: https://github.com/stympy/faker/issues/278
 I18n.reload!
@@ -19,21 +20,12 @@ module Importers
       @logger = logger
       @refresh_type = 'Delta refresh'
       @batch_size = 10000
-      @upload = Upload.find(upload_id)
+      @upload = GrdaWarehouse::Upload.find(upload_id)
       @data_source_id = @upload.data_source.id
       @data_sources = GrdaWarehouse::DataSource.where(id: @data_source_id)
       # Process the oldest upload file for this datasource
       
       @rm_files = false
-
-      # prepare for streaming in faker data on development or staging
-      @fake_it = false
-      if Rails.env == 'staging'
-        logger.info 'Using Fake Client Data'
-        setup_for_fake()
-      else
-        logger.info 'Using Real Client Data'
-      end
     end
 
     def run!
@@ -80,8 +72,12 @@ module Importers
       end
     end
 
-    private def unzip
-      puts "Current file path: #{@upload.file.current_path} #{File.exist?(@upload.file.current_path)}"
+    def unzip
+      reconstitute_path = @upload.file.current_path
+      puts "Re-constituting upload file to: #{reconstitute_path}"
+      File.open(reconstitute_path, 'w+b') do |file|
+        file.write(@upload.content)
+      end
       return unless File.exist?(@upload.file.current_path)
       begin
         unzipped_files = []
@@ -94,9 +90,7 @@ module Importers
             unzip_path = "#{extract_path}/#{file_name}"
             @logger.info "To: #{unzip_path}"
             unzip_parent = File.dirname(unzip_path)
-            unless File.directory?(unzip_parent)
-              FileUtils.mkdir_p(unzip_parent)
-            end
+            FileUtils.mkdir_p(unzip_parent) unless File.directory?(unzip_parent)
             entry.extract(unzip_path)
             unzipped_files << [GrdaWarehouse::Hud.hud_filename_to_model(file_name).name, unzip_path] if file_name.include?('.csv')
           end
@@ -105,8 +99,12 @@ module Importers
         Rails.logger.error ex.message
         raise "Unable to extract file: #{@upload.file.current_path}"
       end
-      # If the file was extracted successfully, delete the source file
+      # If the file was extracted successfully, delete the source file,
+      # we have a copy in the database
       File.delete(@upload.file.current_path) if File.exist?(@upload.file.current_path)
+      # archive_path = File.dirname(@upload.file.current_path.sub(Rails.root.to_s + '/tmp/', "var/upload_archive/#{Date.today.strftime("%Y-%m-%d")}/"))
+      # FileUtils.mkdir_p(archive_path) unless File.directory?(archive_path)
+      # FileUtils.mv(@upload.file.current_path, archive_path) if File.exist?(@upload.file.current_path)
       @upload.update({percent_complete: 0.01, unzipped_files: unzipped_files, import_errors: []})
       @upload.save!
     end

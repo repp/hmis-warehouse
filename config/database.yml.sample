@@ -7,9 +7,9 @@ development:
   <<: *default
   database: boston_hmis_dev
 
-development_grda_warehouse:
+development_cas:
   <<: *default
-  database: boston_grda_warehouse_dev
+  database: boston_cas_dev
 
 # Warning: The database defined as "test" will be erased and
 # re-generated from your development database when you run "rake".
@@ -17,7 +17,3 @@ development_grda_warehouse:
 test:
   <<: *default
   database: boston_hmis_test
-
-test_grda_warehouse:
-  <<: *default
-  database: boston_grda_warehouse_test

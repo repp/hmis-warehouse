@@ -115,7 +115,7 @@ module GrdaWarehouse::Hud
     belongs_to :data_source, inverse_of: :enrollments
     belongs_to :client, class_name: GrdaWarehouse::Hud::Client.name, foreign_key: ['PersonalID', 'data_source_id'], primary_key: ['PersonalID', 'data_source_id'], inverse_of: :enrollments
     belongs_to :export, **hud_belongs(Export), inverse_of: :enrollments
-    has_one :exit, **hud_one(Exit), inverse_of: :enrollment
+    has_one :exit, foreign_key: ['ProjectEntryID', 'PersonalID', 'data_source_id'], primary_key: ['ProjectEntryID', 'PersonalID', 'data_source_id'], inverse_of: :enrollment
     belongs_to :project, class_name: GrdaWarehouse::Hud::Project.name, foreign_key: ['ProjectID', :data_source_id], primary_key: ['ProjectID', :data_source_id], inverse_of: :enrollments
     has_one :organization, through: :project
     has_many :disabilities, class_name: GrdaWarehouse::Hud::Disability.name, primary_key: ['ProjectEntryID',  :data_source_id], foreign_key: ['ProjectEntryID', :data_source_id], inverse_of: :enrollment
@@ -143,6 +143,10 @@ module GrdaWarehouse::Hud
     scope :non_residential, -> {
       joins(:project).where.not(Project: {ProjectType: GrdaWarehouse::Hud::Project::RESIDENTIAL_PROJECT_TYPE_IDS})
     }
+
+    scope :visible_in_window, -> do
+      joins(:data_source).where(data_sources: {visible_in_window: true})
+    end
 
     ADDRESS_FIELDS = %w( LastPermanentStreet LastPermanentCity LastPermanentState LastPermanentZIP ).map(&:to_sym).freeze
 
@@ -236,7 +240,7 @@ module GrdaWarehouse::Hud
     end
 
     # If we haven't been in a homeless project type in the last 30 days, this is a new episode
-    # If we dont' currently have a non-homeless residential and we have had one for the past 90 days 
+    # If we don't currently have a non-homeless residential enrollment and we have had one for the past 90 days, this is a new episode
     def new_episode?
       return false unless GrdaWarehouse::Hud::Project::CHRONIC_PROJECT_TYPES.include?(self.project.ProjectType)
       thirty_days_ago = self.EntryDate - 30.days

@@ -48,6 +48,10 @@ module ArelHelper
       self.class.datediff *args
     end
 
+    def seconds_diff(*args)
+      self.class.seconds_diff *args
+    end
+
     def datepart(*args)
       self.class.datepart *args
     end
@@ -133,6 +137,18 @@ module ArelHelper
       end
     end
 
+
+    # to convert a pair of timestamps into a difference in seconds
+    def seconds_diff(engine, d1, d2)
+      case engine.connection.adapter_name
+      when 'PostgreSQL'
+        delta = Arel::Nodes::Subtraction.new d1, d2
+        nf 'EXTRACT', [ lit("epoch FROM #{delta.to_sql}") ]
+      else
+        raise NotImplementedError
+      end
+    end
+
     # to translate between SQL Server DATEPART and Postgresql DATE_PART, and eventually, if need be, the equivalent mechanisms of
     # other DBMS's
     def datepart(engine, type, d)
@@ -164,6 +180,29 @@ module ArelHelper
       exp = qt exp
       exp = lit exp.to_sql unless exp.respond_to?(:as)
       nf 'CAST', [exp.as(as)]
+    end
+
+
+
+    # Some shortcuts for arel tables
+    def sh_t
+      GrdaWarehouse::ServiceHistory.arel_table
+    end
+    def e_t
+      GrdaWarehouse::Hud::Enrollment.arel_table
+    end
+    def ds_t
+      GrdaWarehouse::DataSource.arel_table
+    end
+    def c_t
+      GrdaWarehouse::Hud::Client.arel_table
+    end
+    def p_t
+      GrdaWarehouse::Hud::Project.arel_table
+    end
+
+    def o_t
+      GrdaWarehouse::Hud::Organization.arel_table
     end
   end
 end

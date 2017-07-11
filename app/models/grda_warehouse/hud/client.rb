@@ -49,7 +49,7 @@ module GrdaWarehouse::Hud
       ].freeze
     end
 
-    has_paper_trail    
+    has_paper_trail
     include ArelHelper
 
     belongs_to :data_source, inverse_of: :clients
@@ -59,6 +59,7 @@ module GrdaWarehouse::Hud
     has_many :warehouse_client_destination, class_name: GrdaWarehouse::WarehouseClient.name, foreign_key: :destination_id, inverse_of: :destination
     has_one :destination_client, through: :warehouse_client_source, source: :destination, inverse_of: :source_clients
     has_many :source_clients, through: :warehouse_client_destination, source: :source, inverse_of: :destination_client
+    has_many :window_source_clients, -> {visible_in_window}, through: :warehouse_client_destination, source: :source, inverse_of: :destination_client
 
     has_one :processed_service_history, -> { where(routine: 'service_history')}, class_name: 'GrdaWarehouse::WarehouseClientsProcessed'
     has_one :first_service_history, -> { where record_type: 'first' }, class_name: 'GrdaWarehouse::ServiceHistory'
@@ -83,6 +84,7 @@ module GrdaWarehouse::Hud
     has_many :employment_educations, **hud_many(EmploymentEducation), inverse_of: :client
     has_many :hmis_forms, class_name: GrdaWarehouse::HmisForm.name
 
+    has_many :organizations, -> { order(:OrganizationName).uniq }, through: :enrollments
     has_many :source_services, through: :source_clients, source: :services
     has_many :source_enrollments, through: :source_clients, source: :enrollments
     has_many :source_enrollment_cocs, through: :source_clients, source: :enrollment_cocs
@@ -95,15 +97,20 @@ module GrdaWarehouse::Hud
     has_many :source_enrollment_income_benefits, through: :source_enrollments, source: :income_benefits
     has_many :source_enrollment_services, through: :source_enrollments, source: :services
     has_many :source_client_attributes_defined_text, through: :source_clients, source: :client_attributes_defined_text
-    has_many :entry_assessments, class_name: GrdaWarehouse::HMIS::EntryAssessment.name
-    has_many :exit_assessments, class_name: GrdaWarehouse::HMIS::ExitAssessment.name
     has_many :staff_x_clients, class_name: GrdaWarehouse::HMIS::StaffXClient.name, inverse_of: :client
     has_many :staff, class_name: GrdaWarehouse::HMIS::Staff.name, through: :staff_x_clients
     has_many :source_api_ids, through: :source_clients, source: :api_id
     has_many :source_hmis_clients, through: :source_clients, source: :hmis_client
     has_many :source_hmis_forms, through: :source_clients, source: :hmis_forms
+    has_many :self_sufficiency_assessments, -> { where(name: 'Self-Sufficientcy Assessment')}, class_name: GrdaWarehouse::HmisForm.name, through: :source_clients, source: :hmis_forms
+    has_many :cas_reports, class_name: 'GrdaWarehouse::CasReport', inverse_of: :client
 
     has_many :chronics, class_name: GrdaWarehouse::Chronic.name, inverse_of: :client
+    has_one :patient, class_name: Health::Patient.name  
+
+    has_many :notes, class_name: GrdaWarehouse::ClientNotes::Base.name, inverse_of: :client
+    has_many :chronic_justifications, class_name: GrdaWarehouse::ClientNotes::ChronicJustification.name
+    has_many :window_notes, class_name: GrdaWarehouse::ClientNotes::WindowNote.name
 
     scope :destination, -> do
       where(data_source: GrdaWarehouse::DataSource.destination)
@@ -111,11 +118,12 @@ module GrdaWarehouse::Hud
     scope :source, -> do
       where(data_source: GrdaWarehouse::DataSource.importable)
     end
-    scope :unmatched, -> do
-      source.where.not(id: GrdaWarehouse::WarehouseClient.select(:source_id))
-    end
+    # For now, this is way to slow, calculate in ruby
+    # scope :unmatched, -> do
+    #   source.where.not(id: GrdaWarehouse::WarehouseClient.select(:source_id))
+    # end
     scope :veteran, -> do
-      where VeteranStatus: 1 
+      where VeteranStatus: 1
     end
     scope :currently_homeless, -> do
       # this is somewhat involved in order to make it composable and somewhat efficient
@@ -176,13 +184,41 @@ module GrdaWarehouse::Hud
       where.not(hiv_positive: false)
     end
 
+    scope :visible_in_window, -> do
+      joins(:data_source).where(data_sources: {visible_in_window: true})
+    end
+
+    scope :has_homeless_service_after_date, -> (date: 31.days.ago) do
+      c_t = arel_table
+      sh_t = GrdaWarehouse::ServiceHistory.arel_table
+      where(id: 
+        GrdaWarehouse::ServiceHistory.service.
+        where(sh_t[:date].gt(date)).
+        where(
+          project_type: GrdaWarehouse::Hud::Project::CHRONIC_PROJECT_TYPES
+        ).select(:client_id).distinct
+      )
+    end
+
+    scope :has_homeless_service_between_dates, -> (start_date: 31.days.ago, end_date: Date.today) do
+      c_t = arel_table
+      sh_t = GrdaWarehouse::ServiceHistory.arel_table
+      where(id: 
+        GrdaWarehouse::ServiceHistory.service.
+        where(date: (start_date..end_date)).
+        where(
+          project_type: GrdaWarehouse::Hud::Project::CHRONIC_PROJECT_TYPES
+        ).select(:client_id).distinct
+      )
+    end
+    
     attr_accessor :merge
     attr_accessor :unmerge
 
     alias_attribute :last_name, :LastName
     alias_attribute :first_name, :FirstName
 
-    # Define a bunch of disability methods we can use to get the response needed 
+    # Define a bunch of disability methods we can use to get the response needed
     # for CAS integration
     # This generates methods like: substance_response()
     GrdaWarehouse::Hud::Disability.disability_types.each do |hud_key, disability_type|
@@ -236,6 +272,11 @@ module GrdaWarehouse::Hud
       chronics.where(date: on).present?
     end
 
+    def longterm_stayer?
+      days = chronics&.last&.days_in_last_three_years || 0
+      days >= 365
+    end
+
     def ever_chronic?
       chronics.any?
     end
@@ -265,13 +306,13 @@ module GrdaWarehouse::Hud
           service_table = GrdaWarehouse::ServiceHistory.arel_table
           client_table = GrdaWarehouse::Hud::Client.arel_table
           columns = {
-            household_id: service_table[:household_id].as('household_id').to_sql, 
-            date: service_table[:date].as('date').to_sql, 
-            client_id: service_table[:client_id].as('client_id').to_sql, 
-            age: service_table[:age].as('age').to_sql, 
-            enrollment_group_id: service_table[:enrollment_group_id].as('enrollment_group_id').to_sql, 
-            FirstName: client_table[:FirstName].as('FirstName').to_sql, 
-            LastName: client_table[:LastName].as('LastName').to_sql, 
+            household_id: service_table[:household_id].as('household_id').to_sql,
+            date: service_table[:date].as('date').to_sql,
+            client_id: service_table[:client_id].as('client_id').to_sql,
+            age: service_table[:age].as('age').to_sql,
+            enrollment_group_id: service_table[:enrollment_group_id].as('enrollment_group_id').to_sql,
+            FirstName: client_table[:FirstName].as('FirstName').to_sql,
+            LastName: client_table[:LastName].as('LastName').to_sql,
             last_date_in_program: service_table[:last_date_in_program].as('last_date_in_program').to_sql,
           }
           hh_where = hids.map{|hh_id, ds_id| "(household_id = '#{hh_id}' and #{GrdaWarehouse::ServiceHistory.quoted_table_name}.data_source_id = #{ds_id})"}.join(' or ')
@@ -282,7 +323,7 @@ module GrdaWarehouse::Hud
             .pluck(*columns.values).map do |row|
               Hash[columns.keys.zip(row)]
             end.uniq
-          entries = entries.group_by{|m| [m['household_id'], m['date']]}
+          entries = entries.map(&:with_indifferent_access).group_by{|m| [m['household_id'], m['date']]}
         end
       end
     end
@@ -299,18 +340,18 @@ module GrdaWarehouse::Hud
         recent_households = households.select do |_, entries|
           # all entries will have the same date and last_date_in_program
           entry = entries.first
-          (entry_date, exit_date) = entry.values_at('date', 'last_date_in_program') 
+          (entry_date, exit_date) = entry.with_indifferent_access.values_at('date', 'last_date_in_program')
           # If we entered the program between the two dates
           # or we entered the program before the later date and haven't exited
           started_within_no_exit = entry_date < before && exit_date.blank?
           # or we entered before the first date and exited after the first date
           entry_date.between?(before, after) || started_within_no_exit || after < exit_date && entry_date < before rescue true
         end
-      elsif after.present? 
+      elsif after.present?
         recent_households = households.select do |_, entries|
           # all entries will have the same date and last_date_in_program
           entry = entries.first
-          (entry_date, exit_date) = entry.values_at('date', 'last_date_in_program') 
+          (entry_date, exit_date) = entry.with_indifferent_access.values_at('date', 'last_date_in_program')
           # If we entered the program after the date in question
           # or we exited the program after the date in question
           # or we haven't exited the program
@@ -321,7 +362,7 @@ module GrdaWarehouse::Hud
       end
       child = false
       adult = false
-      hh.each do |k, h|
+      hh.with_indifferent_access.each do |k, h|
         _, date = k
         # client life stage
         child = self.DOB.present? && age_on(date) < 18
@@ -344,7 +385,7 @@ module GrdaWarehouse::Hud
     end
 
     def hmis_client_response
-      @hmis_client_response ||= JSON.parse(hmis_client.response) if hmis_client.present?
+      @hmis_client_response ||= JSON.parse(hmis_client.response).with_indifferent_access if hmis_client.present?
     end
 
     def email
@@ -464,7 +505,7 @@ module GrdaWarehouse::Hud
 
     def self.cas_columns
       {
-        disability_verified_on: 'Disability Verification on File', 
+        disability_verified_on: 'Disability Verification on File',
         housing_release_status: 'Housing Release Status',
         full_housing_release: 'Full HAN Release on File',
         limited_cas_release: 'Limited CAS Release on File',
@@ -541,15 +582,28 @@ module GrdaWarehouse::Hud
 
     def date_of_last_homeless_service
       # TODO: This will need to be re-written when the Warehouse moves to postgres
+      # service_history.homeless.
+      #   from("#{GrdaWarehouse::ServiceHistory.quoted_table_name} with(index(index_warehouse_client_service_history_on_client_id))").
+      #   maximum(:date)
       service_history.homeless.
-        from("#{GrdaWarehouse::ServiceHistory.quoted_table_name} with(index(index_warehouse_client_service_history_on_client_id))").
+        from(GrdaWarehouse::ServiceHistory.quoted_table_name).
         maximum(:date)
     end
 
-    def last_projects_served_by
+    def last_projects_served_by(include_confidential_names: false)
       # FIXME: this is a hack because processed_service_history's date sometimes doesn't match any service history record
       # astoundingly, this is faster than a more sensible database query that doesn't return everything
-      service_history.pluck(:date, :project_name).group_by(&:first).max_by(&:first).last.map(&:last).uniq.sort
+      service_history.joins(:project).
+        pluck(:date, :project_name, :confidential).
+        group_by(&:first).
+        max_by(&:first).
+        last.map do |_,project_name, confidential|
+          if ! confidential || include_confidential_names
+            project_name
+          else
+            'Confidential Program'
+          end
+        end.uniq.sort
       # service_history.where( date: processed_service_history.select(:last_date_served) ).order(:project_name).distinct.pluck(:project_name)
     end
 
@@ -558,7 +612,6 @@ module GrdaWarehouse::Hud
     end
 
     def days_of_service
-      # self.class.where(id: self.id).service_days_by_client_id.values.first
       processed_service_history.try(:days_served)
     end
 
@@ -573,17 +626,6 @@ module GrdaWarehouse::Hud
           end
         end
       end
-    end
-
-    def self.service_days_by_client_id
-      services = GrdaWarehouse::ServiceHistory
-      at = services.arel_table
-      query = services.service.
-        joins(:client).
-        select(:client_id).
-        select(nf( 'COUNT', [ nf( 'DISTINCT', [at[:date]] ) ] )).
-        group(:client_id)
-      services.connection.select_rows(query.to_sql).to_h
     end
 
     def self.without_service_history
@@ -643,7 +685,7 @@ module GrdaWarehouse::Hud
       end
     end
 
-    def self.text_search(text)
+    def self.text_search(text, client_scope:)
       return none unless text.present?
       text.strip!
       sa = source.arel_table
@@ -687,11 +729,11 @@ module GrdaWarehouse::Hud
         end
       end
 
-      client_ids = GrdaWarehouse::Hud::Client
-        .joins(:warehouse_client_source).source
-        .where(where)
-        .preload(:destination_client)
-        .map{|m| m.destination_client.id}
+      client_ids = client_scope.
+        joins(:warehouse_client_source).source.
+        where(where).
+        preload(:destination_client).
+        map{|m| m.destination_client.id}
       where(id: client_ids)
     end
 
@@ -781,8 +823,8 @@ module GrdaWarehouse::Hud
           if nicks.any?
             nicks_for_search = nicks.map{|m| GrdaWarehouse::Hud::Client.connection.quote(m)}.join(",")
             similar_destinations = self.class.destination.where(
-              nv('LOWER', [Client.FirstName]).in(nicks_for_search)
-            ).where(c_arel['LastName'].matches("%#{self.LastName}%")).
+              nf('LOWER', [c_arel[:FirstName]]).in(nicks_for_search)
+            ).where(c_arel['LastName'].matches("%#{self.LastName.downcase}%")).
             where.not(id: self.id)
             m[:by_nickname] = similar_destinations if similar_destinations.any?
           end
@@ -794,9 +836,9 @@ module GrdaWarehouse::Hud
             alt_names_for_search = alt_names.map{|m| GrdaWarehouse::Hud::Client.connection.quote(m)}.join(",")
             similar_destinations = self.class.destination.where(
               nf('LOWER', [c_arel[:FirstName]]).in(alt_names_for_search).
-                and(nf('LOWER', [c_arel[:LastName]]).matches('#{self.LastName}%')).
+                and(nf('LOWER', [c_arel[:LastName]]).matches('#{self.LastName.downcase}%')).
               or(nf('LOWER', [c_arel[:LastName]]).in(alt_names_for_search).
-                and(nf('LOWER', [c_arel[:FirstName]]).matches('#{self.FirstName}%'))
+                and(nf('LOWER', [c_arel[:FirstName]]).matches('#{self.FirstName.downcase}%'))
               )
             ).where.not(id: self.id)
             m[:where_the_name_sounds_similar] = similar_destinations if similar_destinations.any?
@@ -875,7 +917,7 @@ module GrdaWarehouse::Hud
         end
         # clean up the previous destination
         if prev_destination_client
-          
+
           # move any CAS column data
           previous_cas_columns = prev_destination_client.attributes.slice(*self.class.cas_columns.keys.map(&:to_s))
           current_cas_columns = self.attributes.slice(*self.class.cas_columns.keys.map(&:to_s))
@@ -884,6 +926,12 @@ module GrdaWarehouse::Hud
           self.save()
           prev_destination_client.invalidate_service_history
           prev_destination_client.delete if prev_destination_client.source_clients(true).empty?
+
+          # move any client notes
+          GrdaWarehouse::ClientNotes::Base.where(client_id: prev_destination_client.id).update_all(client_id: self.id)
+
+          # move any patients
+          Health::Patient.where(client_id: prev_destination_client.id).update_all(client_id: self.id)
         end
         # and invaldiate our own service history
         invalidate_service_history
@@ -906,9 +954,33 @@ module GrdaWarehouse::Hud
         .map(&:new_episode?)
         .count(true)
     end
+    
+    def months_served_since date:
+      service_history.
+        service
+        .homeless
+        .where(date: date..Date.today)
+        .order(date: :asc)
+        .pluck(:date)
+        .map{|m| [m.month, m.year]}
+        .uniq
+        .count
+    end
+    
+    def months_served_between start_date:, end_date:
+      service_history.
+        service
+        .homeless
+        .where(date: start_date..end_date)
+        .order(date: :asc)
+        .pluck(:date)
+        .map{|m| [m.month, m.year]}
+        .uniq
+        .count
+    end
 
     # build an array of useful hashes for the enrollments roll-ups
-    def enrollments_for scope
+    def enrollments_for scope, include_confidential_names: false
       conn = ActiveRecord::Base.connection
       exit_table = GrdaWarehouse::Hud::Exit.arel_table
       enrollment_table = GrdaWarehouse::Hud::Enrollment.arel_table
@@ -931,6 +1003,7 @@ module GrdaWarehouse::Hud
         OrganizationName: organization_table[:OrganizationName].as('OrganizationName').to_sql,
         ProjectID: project_table[:ProjectID].as('ProjectID').to_sql,
         project_id: project_table[:id].as('project_id').to_sql,
+        confidential: project_table[:confidential].as('confidential').to_sql,
         client_source_id: client_table[:id].as('client_source_id').to_sql,
       }
       exit_join = enrollment_table.join(exit_table, Arel::Nodes::OuterJoin).
@@ -940,20 +1013,24 @@ module GrdaWarehouse::Hud
       enrollments = scope.
         joins(exit_join.join_sources).
         joins(:service_histories, :project).
-        # joins(:organization).
         where(service_table[:record_type].in(['service', 'entry'])).
         select(*columns.values).
         pluck(*columns.values).
         map do |row|
           Hash[columns.keys.zip(row)]
         end
-      enrollments_by_project_entry = enrollments.group_by do |m| 
+      enrollments_by_project_entry = enrollments.group_by do |m|
         [m[:ProjectEntryID], m[:ProjectID], m[:EntryDate], m[:data_source_id]]
       end
 
       enrollments_by_project_entry.map do |_, e|
         e.sort_by!{|m| m[:date]}
         meta = e.select{|m| m[:record_type] == 'entry'}.first
+        # Hide confidential program names, if appropriate
+        meta[:project_name] = "#{meta[:project_name]} < #{meta[:OrganizationName]}"
+        unless include_confidential_names
+          meta[:project_name] = GrdaWarehouse::Hud::Project.confidential_project_name if meta[:confidential] 
+        end
         dates_served = e.select{|m| m[:record_type] == 'service'}.map{|m| m[:date]}.uniq
         # days that are not also served by a later enrollment of the same project type
         # unless this is a bed-night style project, in which case we count all nights
@@ -962,16 +1039,16 @@ module GrdaWarehouse::Hud
         else
           next_enrollment(enrollments: enrollments, type: meta[:project_type], start: meta[:EntryDate]).try(:[], :EntryDate) || meta[:ExitDate]
         end
-        # days included in adjusted days that are not also served by a residential project 
+        # days included in adjusted days that are not also served by a residential project
         adjusted_dates_for_similar_programs = adjusted_dates(dates: dates_served, stop_date: count_until)
-         
+
         homeless_dates_for_enrollment = adjusted_dates_for_similar_programs - residential_dates(enrollments: enrollments)
-        
+
         {
           client_source_id: meta[:client_source_id],
           project_id: meta[:project_id],
           ProjectID: meta[:ProjectID],
-          project_name: "#{meta[:project_name]} < #{meta[:OrganizationName]}",
+          project_name: meta[:project_name],
           entry_date: meta[:EntryDate],
           exit_date: meta[:ExitDate],
           days: dates_served.count,
@@ -1003,7 +1080,7 @@ module GrdaWarehouse::Hud
           EntryDate: e[:EntryDate],
           ExitDate: e[:ExitDate],
           project_type: e[:project_type],
-          data_source_id: e[:data_source_id], 
+          data_source_id: e[:data_source_id],
         }
       end.uniq
     end
@@ -1022,7 +1099,7 @@ module GrdaWarehouse::Hud
 
     private def residential_dates enrollments:
       @non_homeless_types ||= GrdaWarehouse::Hud::Project::RESIDENTIAL_PROJECT_TYPE_IDS - GrdaWarehouse::Hud::Project::CHRONIC_PROJECT_TYPES
-      @residential_dates ||= enrollments.select do |e| 
+      @residential_dates ||= enrollments.select do |e|
         e[:record_type] == 'service' && e[:project_type].in?(@non_homeless_types)
       end.map do |e|
        e[:date]
@@ -1030,7 +1107,7 @@ module GrdaWarehouse::Hud
     end
 
     private def homeless_dates enrollments:
-      @homeless_dates ||= enrollments.select do |e| 
+      @homeless_dates ||= enrollments.select do |e|
         e[:project_type].in? GrdaWarehouse::Hud::Project::CHRONIC_PROJECT_TYPES
       end.map do |e|
        e[:date]
@@ -1042,7 +1119,7 @@ module GrdaWarehouse::Hud
     end
 
     # If we haven't been in a homeless project type in the last 30 days, this is a new episode
-    # If we dont' currently have a non-homeless residential and we have had one for the past 90 days 
+    # If we dont' currently have a non-homeless residential and we have had one for the past 90 days
     private def new_episode? enrollments:, project_type:, entry_date:
       return false unless GrdaWarehouse::Hud::Project::CHRONIC_PROJECT_TYPES.include?(project_type)
       thirty_days_ago = entry_date - 30.days

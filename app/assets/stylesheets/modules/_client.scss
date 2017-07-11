@@ -179,7 +179,7 @@ $client-match-action-row-height: 22px;
   max-width: 250px;
   max-height: 250px;
 }
-.clients__client 
+.clients__client
 {
   padding-bottom: 0.5em;
   padding-top: 0.5em;
@@ -238,7 +238,7 @@ $client-match-action-row-height: 22px;
 {
   border-bottom: 1px solid $gray-040;
 }
-.enrollment__project_type 
+.enrollment__project_type
 {
   display: inline-block;
 }
@@ -255,17 +255,33 @@ $client-match-action-row-height: 22px;
 .rollup__square
 {
   font-size: 0.7em;
-  color: white; 
+  color: white;
   padding: 0.2em 0.4em;
   font-weight: bold;
   cursor: pointer;
 }
+.destination-data-source-tag
+{
+  display: inline-block;
+  min-height: 10px;
+  min-width: 10px;
+  margin: auto;
+}
+
+.destination-sqr
+{
+  background-color: $cob-sg-blue-002;
+  padding: 2px 5px;
+}
+
+
 .client__chronic
 {
   text-align: center;
   font-size: 1.2em;
   margin-top: 0.5em;
   margin-bottom: 0.25em;
+  padding: 0.5em 0.5em;
 }
 .clients__chronic
 {
@@ -277,8 +293,30 @@ $client-match-action-row-height: 22px;
   float: right;
   clear: right;
 }
-.client__cas_flags .form-group,
-.client__cas_flags .checkbox
+.client__cas-flags .form-group,
+.client__cas-flags .checkbox
 {
   margin-bottom: 0.25em;
+}
+
+.client-flag
+{
+  text-align: center;
+  margin-top: 0.5em;
+  margin-bottom: 0.25em;
+  padding: 1em 0.5em;
+  display: inline-block;
+  padding: 0.5em 0.5em;
+}
+
+.client-flag__longterm-stayer
+{
+  background-color: $brand-warning;
+  border-color: $brand-warning;
+}
+
+.client-flag__cas
+{
+  background-color: $brand-info;
+  border-color: $brand-info;
 }
