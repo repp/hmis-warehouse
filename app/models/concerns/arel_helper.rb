@@ -61,6 +61,32 @@ module ArelHelper
     end
   end
 
+  # Some shortcuts for arel tables
+  def sh_t
+    GrdaWarehouse::ServiceHistory.arel_table
+  end
+  def s_t
+    GrdaWarehouse::Hud::Service.arel_table
+  end
+  def e_t
+    GrdaWarehouse::Hud::Enrollment.arel_table
+  end
+  def ex_t
+    GrdaWarehouse::Hud::Exit.arel_table
+  end
+  def ds_t
+     GrdaWarehouse::DataSource.arel_table
+  end
+  def c_t
+    GrdaWarehouse::Hud::Client.arel_table
+  end
+  def p_t
+    GrdaWarehouse::Hud::Project.arel_table
+  end
+  def o_t
+    GrdaWarehouse::Hud::Organization.arel_table
+  end
+
   # and to the class itself (so they can be used in scopes, for example)
   class_methods do
 
@@ -105,6 +131,10 @@ module ArelHelper
     def nf( name, args=[], aka=nil )
       raise 'args must be an Array' unless args.is_a?(Array)
       Arel::Nodes::NamedFunction.new name, args.map{ |v| qt v }, aka
+    end
+
+    def cl(*args)
+      nf 'COALESCE', args
     end
 
     # bonk out a SQL literal
@@ -188,8 +218,14 @@ module ArelHelper
     def sh_t
       GrdaWarehouse::ServiceHistory.arel_table
     end
+    def s_t
+      GrdaWarehouse::Hud::Service.arel_table
+    end
     def e_t
       GrdaWarehouse::Hud::Enrollment.arel_table
+    end
+    def ex_t
+      GrdaWarehouse::Hud::Exit.arel_table
     end
     def ds_t
       GrdaWarehouse::DataSource.arel_table
@@ -200,7 +236,6 @@ module ArelHelper
     def p_t
       GrdaWarehouse::Hud::Project.arel_table
     end
-
     def o_t
       GrdaWarehouse::Hud::Organization.arel_table
     end

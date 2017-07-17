@@ -11,7 +11,7 @@ module WarehouseReports
         ht = history.arel_table
         @clients = @clients.
           joins(:first_service_history).
-          preload(:first_service_history, first_service_history: :organization, source_clients: :data_source).
+          preload(:first_service_history, first_service_history: [:organization, :project], source_clients: :data_source).
           entered_in_range(@range.range).
           select( :id, :FirstName, :LastName, ht[:date] ).
           order( ht[:date], :LastName, :FirstName )
@@ -19,7 +19,7 @@ module WarehouseReports
         @project_types.reject!(&:empty?)
         if @project_types.any?
           @project_types.map!(&:to_i)
-          @clients = @clients.where(history.table_name => {project_type: @project_types})
+          @clients = @clients.where(ht[:computed_project_type].in(@project_types))
         end
         puts @clients
       else
@@ -52,6 +52,10 @@ module WarehouseReports
 
     private def client_source
       GrdaWarehouse::Hud::Client.destination
+    end
+
+    def project_source
+      GrdaWarehouse::Hud::Project
     end
   end
 end

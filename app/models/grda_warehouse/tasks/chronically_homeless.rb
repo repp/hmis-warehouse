@@ -31,7 +31,8 @@ module GrdaWarehouse::Tasks
     # Pass client_ids as an array
     def initialize(
       date: Date.today, 
-      count_so_as_full_month: true, 
+      count_so_as_full_month: true,
+      use_hud_override: true,
       dry_run: false, 
       client_ids: nil,
       debug: false
@@ -47,6 +48,10 @@ module GrdaWarehouse::Tasks
       @clients = client_ids
       @limited = client_ids.present? && client_ids.any?
       @debug = debug
+      @project_type_column = :project_type
+      if use_hud_override
+        @project_type_column = :computed_project_type
+      end
     end
 
     def run!
@@ -102,9 +107,9 @@ module GrdaWarehouse::Tasks
       end
       logger.info "Found #{@chronically_homeless.size} chronically homeless clients"
       unless @dry_run
-        GrdaWarehouse::Chronic.transaction do
-          GrdaWarehouse::Chronic.where(date: @date, dmh: false).delete_all
-          insert_batch GrdaWarehouse::Chronic, @client_details.values.first.keys, @client_details.values.map(&:values)
+        chronic_source.transaction do
+          chronic_source.where(date: @date, dmh: false).delete_all
+          insert_batch chronic_source, @client_details.values.first.keys, @client_details.values.map(&:values)
         end
         logger.info 'Done updating status of chronically homeless clients'
       end
@@ -121,8 +126,8 @@ module GrdaWarehouse::Tasks
     end
 
     def load_active_clients
-      @clients ||= GrdaWarehouse::ServiceHistory.
-        currently_homeless(date: @date).
+      @clients ||= service_history_source.
+        hud_currently_homeless(date: @date).
         where.not(client_id: dmh_clients).
         joins(:processed_client).
         select(:client_id).
@@ -149,26 +154,24 @@ module GrdaWarehouse::Tasks
     # project stay.  If there is, limit the full request to only the days after the stay
     def residential_history_for_client(client_id:)
       debug_log "calculating residential history"
-      services = GrdaWarehouse::ServiceHistory
-      st = services.arel_table
-      homeless_reset = services.residential.
-          entry_within_date_range(start_date: @date - 3.years, end_date: @date).
-          where(project_type:  RESIDENTIAL_NON_HOMELESS_PROJECT_TYPE).
-          where.not(last_date_in_program: nil).
-          where( datediff( services, 'day', st[:first_date_in_program], st[:last_date_in_program] ).gteq 90 ).
-          where(client_id: client_id).
-          maximum(:last_date_in_program)
+      homeless_reset = service_history_source.hud_residential.
+        entry_within_date_range(start_date: @date - 3.years, end_date: @date).
+        where(@project_type_column => RESIDENTIAL_NON_HOMELESS_PROJECT_TYPE).
+        where.not(last_date_in_program: nil).
+        where( datediff( service_history_source, 'day', sh_t[:first_date_in_program], sh_t[:last_date_in_program] ).gteq 90 ).
+        where(client_id: client_id).
+        maximum(:last_date_in_program)
       # Just load up the histories for the current client, loading all takes too much RAM
-      cols = service_history_columns
-      scope = GrdaWarehouse::ServiceHistory.residential.
+      scope = service_history_source.hud_residential.
+        joins(:project).
         service_within_date_range(start_date: @date - 3.years, end_date: @date).
         where(client_id: client_id)
       if homeless_reset.present?
         debug_log "Found previous residential history, using #{homeless_reset} instead of #{@date - 3.years} as beginning of calculation"
         scope = scope.where(date: homeless_reset..@date)
       end 
-      all_dates = scope.pluck(*cols).map do |row|
-        cols.zip(row).to_h
+      all_dates = scope.pluck(*service_history_columns.values).map do |row|
+        service_history_columns.keys.zip(row).to_h
       end
       debug_log "Found #{all_dates.size} days in the residential history"
       # group by enrollment and then calculated adjusted dates for each enrollment
@@ -278,7 +281,7 @@ module GrdaWarehouse::Tasks
     end
 
     def residential_dates enrollments:
-      @non_homeless_types ||= GrdaWarehouse::Hud::Project::RESIDENTIAL_PROJECT_TYPE_IDS - GrdaWarehouse::Hud::Project::CHRONIC_PROJECT_TYPES
+      @non_homeless_types ||= project_source::RESIDENTIAL_PROJECT_TYPE_IDS - project_source::CHRONIC_PROJECT_TYPES
       @residential_dates ||= enrollments.select do |e| 
         e[:project_type].in? @non_homeless_types
       end.map do |e|
@@ -288,7 +291,7 @@ module GrdaWarehouse::Tasks
 
     def homeless_dates enrollments:
       @homeless_dates ||= enrollments.select do |e| 
-        e[:project_type].in? GrdaWarehouse::Hud::Project::CHRONIC_PROJECT_TYPES
+        e[:project_type].in? project_source::CHRONIC_PROJECT_TYPES
       end.map do |e|
        e[:date]
       end.compact.uniq
@@ -349,16 +352,16 @@ module GrdaWarehouse::Tasks
     end
 
     def dmh_projects_filter 
-      GrdaWarehouse::Hud::Project.
+      project_source.
         where(OrganizationID: DMH_SITE).
         pluck(:ProjectID, :data_source_id).
         map do |project_id, data_source_id|
-          "(project_id = '#{project_id}' and data_source_id = #{data_source_id})"
+          sh_t[:project_id].eq(project_id).and(sh_t[:data_source_id].eq(data_source_id)).to_sql
       end.join(' or ')
     end
 
     def dmh_clients
-      GrdaWarehouse::ServiceHistory.
+      service_history_source.
         ongoing(on_date: @date).
         where(dmh_projects_filter).
         joins(:processed_client).
@@ -367,17 +370,33 @@ module GrdaWarehouse::Tasks
     end
 
     def service_history_columns
-      [
-        :client_id,
-        :date,
-        :first_date_in_program,
-        :last_date_in_program,
-        :enrollment_group_id,
-        :project_type,
-        :project_id,
-        :project_tracking_method,
-        :project_name,
-      ]
+      {
+        client_id: :client_id,
+        date: :date,
+        first_date_in_program: :first_date_in_program,
+        last_date_in_program: :last_date_in_program,
+        enrollment_group_id: :enrollment_group_id,
+        project_type: @project_type_column,
+        project_id: :project_id,
+        project_tracking_method: :project_tracking_method,
+        project_name: :project_name,
+      }
+    end
+
+    def service_history_source
+      GrdaWarehouse::ServiceHistory
+    end
+
+    def project_source
+      GrdaWarehouse::Hud::Project
+    end
+
+    def chronic_source
+      GrdaWarehouse::Chronic
+    end
+  
+    def sh_t
+      service_history_source.arel_table
     end
   end
 end

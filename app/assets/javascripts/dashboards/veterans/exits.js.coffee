@@ -6,15 +6,14 @@ class App.Dashboards.Veterans.Exits
     Chart.defaults.global.elements.rectangle.backgroundColor = '#45789C'
     Chart.defaults.global.elements.rectangle.borderColor = '#45789C'
     Chart.defaults.global.elements.rectangle.borderWidth = 1
-    Chart.defaults.global.onClick = @_follow_link
-
-    data =
+    data = 
       labels: (v for k, v of @labels),
       datasets: (v for k, v of @data),
     @exits_chart = new Chart @chart,
       type: 'bar',
       data: data,
       options:
+        onClick: @_follow_link,
         bezierCurve: false,
         scales:
           xAxes: [

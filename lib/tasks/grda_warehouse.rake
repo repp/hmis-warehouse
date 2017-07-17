@@ -97,6 +97,13 @@ namespace :grda_warehouse do
       grda.munged_personal_id = true
       grda.save
 
+      grda = GrdaWarehouse::DataSource.where(name: 'Silver Island').first_or_create
+      grda.file_path = Rails.root.join.to_s << '/var/hmis/si'
+      grda.source_type = 'samba'
+      grda.short_name = 'SI'
+      grda.munged_personal_id = true
+      grda.save
+
       dnd_warehouse = GrdaWarehouse::DataSource.where(name: 'HMIS Warehouse').first_or_create
       dnd_warehouse.short_name = 'Warehouse'
       dnd_warehouse.save
@@ -104,7 +111,7 @@ namespace :grda_warehouse do
   end
 
   desc "Import Many HUD CSVs for development"
-  task :import_dev_hud_csvs, [:environment, "log:info_to_stdout"] do
+  task import_dev_hud_csvs: [:environment, "log:info_to_stdout"] do
     # loop over data sources, looking for sub directories, find the first one
     # copy all files into the data source import path
     # delete the folder, run samba import for that DS
@@ -157,6 +164,7 @@ namespace :grda_warehouse do
   task :calculate_chronic_homelessness, [:date] => [:environment, "log:info_to_stdout"] do |task, args|
     date = (args.date || Date.today).to_date
     GrdaWarehouse::Tasks::ChronicallyHomeless.new(date: date).run!
+    GrdaWarehouse::Tasks::DmhChronicallyHomeless.new(date: date).run!
   end
 
   desc "Calculate chronic homelessness ['2015-01-15, 2017-01-15, 1, month']; defaults: interval=1, unit=month"
@@ -168,24 +176,6 @@ namespace :grda_warehouse do
     unit = (args.unit || :month).to_sym
     while start_date < end_date
       GrdaWarehouse::Tasks::ChronicallyHomeless.new(date: start_date).run!
-      start_date += interval.send(unit)
-    end
-  end
-
-  desc "Calculate DMH chronic homelessness ['2017-01-15']; defaults: date=Date.today"
-  task :calculate_dmh_chronic_homelessness, [:date] => [:environment, "log:info_to_stdout"] do |task, args|
-    date = (args.date || Date.today).to_date
-    GrdaWarehouse::Tasks::DmhChronicallyHomeless.new(date: date).run!
-  end
-
-  desc "Calculate DMH chronic homelessness ['2015-01-15, 2017-01-15, 1, month']; defaults: interval=1, unit=month"
-  task :calculate_dmh_chronic_for_interval, [:start, :end, :interval, :unit] => [:environment, "log:info_to_stdout"] do |task, args|
-    raise 'dates required' unless args.start.present? && args.end.present?
-    start_date = args.start.to_date
-    end_date = args.end.to_date
-    interval = (args.interval || 1).to_i
-    unit = (args.unit || :month).to_sym
-    while start_date < end_date
       GrdaWarehouse::Tasks::DmhChronicallyHomeless.new(date: start_date).run!
       start_date += interval.send(unit)
     end

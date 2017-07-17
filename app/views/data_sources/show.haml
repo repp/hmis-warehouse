@@ -11,8 +11,8 @@
         %tr
           %th Date Span
           %td
-            - if @data_source.data_span.present?
-              = @data_source.data_span.join(' - ')
+            - if data_span = @data_source.data_span
+              = "#{data_span[:start_date]}-#{data_span[:end_date]}"
         -if @data_source.uploads.any? && can_view_imports?
           %tr
             %th Uploads
@@ -24,7 +24,7 @@
             %th
               Visible in the Window into the Warehouse?
             %td
-              = f.input :visible_in_window, label: false, input_html: {name: 'data_source[visible_in_window]'}
+              = f.input :visible_in_window, label: false
     .col-sm-4
       - if can_upload_hud_zips?
         = link_to new_data_source_upload_path(@data_source), class: 'btn btn-primary' do
@@ -53,7 +53,7 @@
                   %tr
                     %th{style: 'width:30%'} Name
                     %th{style: 'width:15%'} Project Type
-                    %th{style: 'width:20%'} Act as Project Type for HUD Reports
+                    %th{style: 'width:20%'} Act as Project Type
                     %th{style: 'width:10%'} 
                       HUD CoC Code
                       %br

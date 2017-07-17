@@ -28,6 +28,7 @@ module GrdaWarehouse::Hud
         "RaceNone",
         "Ethnicity",
         "Gender",
+        "OtherGender",
         "VeteranStatus",
         "YearEnteredService",
         "YearSeparated",
@@ -83,6 +84,9 @@ module GrdaWarehouse::Hud
     has_many :client_attributes_defined_text, class_name: GrdaWarehouse::HMIS::ClientAttributeDefinedText.name, inverse_of: :client
     has_many :employment_educations, **hud_many(EmploymentEducation), inverse_of: :client
     has_many :hmis_forms, class_name: GrdaWarehouse::HmisForm.name
+    has_many :non_confidential_hmis_forms, -> do
+      joins(:hmis_forms).where(id: GrdaWarehouse::HmisForm.non_confidential.select(:id))
+    end, class_name: GrdaWarehouse::HmisForm.name
 
     has_many :organizations, -> { order(:OrganizationName).uniq }, through: :enrollments
     has_many :source_services, through: :source_clients, source: :services
@@ -102,6 +106,7 @@ module GrdaWarehouse::Hud
     has_many :source_api_ids, through: :source_clients, source: :api_id
     has_many :source_hmis_clients, through: :source_clients, source: :hmis_client
     has_many :source_hmis_forms, through: :source_clients, source: :hmis_forms
+    has_many :source_non_confidential_hmis_forms, through: :source_clients, source: :non_confidential_hmis_forms
     has_many :self_sufficiency_assessments, -> { where(name: 'Self-Sufficientcy Assessment')}, class_name: GrdaWarehouse::HmisForm.name, through: :source_clients, source: :hmis_forms
     has_many :cas_reports, class_name: 'GrdaWarehouse::CasReport', inverse_of: :client
 
@@ -273,7 +278,7 @@ module GrdaWarehouse::Hud
     end
 
     def longterm_stayer?
-      days = chronics&.last&.days_in_last_three_years || 0
+      days = chronics.order(date: :asc)&.last&.days_in_last_three_years || 0
       days >= 365
     end
 
@@ -593,22 +598,23 @@ module GrdaWarehouse::Hud
     def last_projects_served_by(include_confidential_names: false)
       # FIXME: this is a hack because processed_service_history's date sometimes doesn't match any service history record
       # astoundingly, this is faster than a more sensible database query that doesn't return everything
-      service_history.joins(:project).
+      sh = service_history.joins(:project).
         pluck(:date, :project_name, :confidential).
         group_by(&:first).
-        max_by(&:first).
-        last.map do |_,project_name, confidential|
-          if ! confidential || include_confidential_names
-            project_name
-          else
-            'Confidential Program'
-          end
-        end.uniq.sort
+        max_by(&:first)
+      return [] unless sh.present?  
+      sh.last.map do |_,project_name, confidential|
+        if ! confidential || include_confidential_names
+          project_name
+        else
+          'Confidential Program'
+        end
+      end.uniq.sort
       # service_history.where( date: processed_service_history.select(:last_date_served) ).order(:project_name).distinct.pluck(:project_name)
     end
 
     def weeks_of_service
-      total_days_of_service / 7
+      total_days_of_service / 7 rescue 'unknown'
     end
 
     def days_of_service
@@ -637,14 +643,14 @@ module GrdaWarehouse::Hud
     end
 
     def total_days_of_service
-      ((date_of_last_service - date_of_first_service).to_i + 1)
+      ((date_of_last_service - date_of_first_service).to_i + 1) rescue 'unknown'
     end
 
     def service_dates_for_display start_date
       @service_dates_for_display ||= begin
         st = service_history.arel_table
-        query = service_history.
-          select( :date, :record_type, :project_id, :project_type, :enrollment_group_id, :first_date_in_program, :last_date_in_program, :data_source_id ).
+        query = service_history.joins(:project).
+          select( :date, :record_type, :project_id, :enrollment_group_id, :first_date_in_program, :last_date_in_program, :data_source_id, st[:computed_project_type].as('project_type').to_sql).
           where( st[:date].gt start_date.beginning_of_week ).
           where( st[:date].lteq start_date.end_of_month.end_of_week ).
           order( date: :asc ).
@@ -941,7 +947,7 @@ module GrdaWarehouse::Hud
 
     def homeless_episodes_since date:
       source_enrollments
-        .homeless
+        .chronic
         .where(EntryDate: date..Date.today)
         .map(&:new_episode?)
         .count(true)
@@ -949,7 +955,7 @@ module GrdaWarehouse::Hud
 
     def homeless_episodes_between start_date:, end_date:
       source_enrollments
-        .homeless
+        .chronic
         .where(EntryDate: start_date..end_date)
         .map(&:new_episode?)
         .count(true)
@@ -994,7 +1000,7 @@ module GrdaWarehouse::Hud
         PersonalID: enrollment_table[:PersonalID].as('PersonalID').to_sql,
         ExitDate: exit_table[:ExitDate].as('ExitDate').to_sql,
         date: service_table[:date].as('date').to_sql,
-        project_type: service_table[:project_type].as('project_type').to_sql,
+        project_type: service_table[:computed_project_type].as('project_type').to_sql,
         project_name: service_table[:project_name].as('project_name').to_sql,
         project_tracking_method: service_table[:project_tracking_method].as('project_tracking_method').to_sql,
         household_id: service_table[:household_id].as('household_id').to_sql,

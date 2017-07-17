@@ -72,3 +72,8 @@ bower.json
 .DS_Store
 *.sublime-project
 *.sublime-workspace
+
+# Ignore themes
+app/assets/stylesheets/theme/styles
+app/assets/images/theme/logo
+app/assets/images/theme/icons

@@ -855,7 +855,8 @@ CREATE TABLE "Project" (
     id integer NOT NULL,
     act_as_project_type integer,
     hud_continuum_funded boolean,
-    confidential boolean DEFAULT false NOT NULL
+    confidential boolean DEFAULT false NOT NULL,
+    computed_project_type integer
 );
 
 
@@ -1457,7 +1458,9 @@ CREATE TABLE hmis_assessments (
     "fetch" boolean DEFAULT false NOT NULL,
     active boolean DEFAULT true NOT NULL,
     last_fetched_at timestamp without time zone,
-    data_source_id integer NOT NULL
+    data_source_id integer NOT NULL,
+    confidential boolean DEFAULT false NOT NULL,
+    exclude_from_window boolean DEFAULT false NOT NULL
 );
 
 
@@ -1572,7 +1575,8 @@ CREATE TABLE hmis_forms (
     collected_at timestamp without time zone,
     staff character varying,
     assessment_type character varying,
-    collection_location character varying
+    collection_location character varying,
+    assessment_id integer
 );
 
 
@@ -2499,7 +2503,8 @@ CREATE TABLE warehouse_client_service_history (
     record_type character varying(50) NOT NULL,
     housing_status_at_entry integer,
     housing_status_at_exit integer,
-    service_type integer
+    service_type integer,
+    computed_project_type integer
 );
 
 
@@ -3820,6 +3825,13 @@ CREATE INDEX "index_Project_on_ProjectType" ON "Project" USING btree ("ProjectTy
 
 
 --
+-- Name: index_Project_on_computed_project_type; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX "index_Project_on_computed_project_type" ON "Project" USING btree (computed_project_type);
+
+
+--
 -- Name: index_Project_on_data_source_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3831,6 +3843,13 @@ CREATE INDEX "index_Project_on_data_source_id" ON "Project" USING btree (data_so
 --
 
 CREATE INDEX "index_Services_on_DateDeleted" ON "Services" USING btree ("DateDeleted");
+
+
+--
+-- Name: index_Services_on_DateProvided; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX "index_Services_on_DateProvided" ON "Services" USING btree ("DateProvided");
 
 
 --
@@ -4016,6 +4035,13 @@ CREATE INDEX index_hmis_clients_on_client_id ON hmis_clients USING btree (client
 
 
 --
+-- Name: index_hmis_forms_on_assessment_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_hmis_forms_on_assessment_id ON hmis_forms USING btree (assessment_id);
+
+
+--
 -- Name: index_hmis_forms_on_client_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4111,6 +4137,13 @@ CREATE UNIQUE INDEX index_staff_x_client_s_id_c_id_r_id ON hmis_staff_x_clients 
 --
 
 CREATE INDEX index_uploads_on_deleted_at ON uploads USING btree (deleted_at);
+
+
+--
+-- Name: index_warehouse_client_service_history_on_computed_project_type; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_warehouse_client_service_history_on_computed_project_type ON warehouse_client_service_history USING btree (computed_project_type);
 
 
 --
@@ -4282,6 +4315,13 @@ CREATE INDEX project_export_id ON "Project" USING btree ("ExportID");
 
 
 --
+-- Name: project_project_override_index; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX project_project_override_index ON "Project" USING btree ((COALESCE(act_as_project_type, "ProjectType")));
+
+
+--
 -- Name: services_date_created; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4342,13 +4382,6 @@ CREATE UNIQUE INDEX unique_schema_migrations ON schema_migrations USING btree (v
 --
 
 CREATE UNIQUE INDEX "unk_Affiliation" ON "Affiliation" USING btree (data_source_id, "AffiliationID");
-
-
---
--- Name: unk_Client; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX "unk_Client" ON "Client" USING btree (data_source_id, "PersonalID");
 
 
 --
@@ -4856,4 +4889,16 @@ INSERT INTO schema_migrations (version) VALUES ('20170626133126');
 INSERT INTO schema_migrations (version) VALUES ('20170705125336');
 
 INSERT INTO schema_migrations (version) VALUES ('20170706145106');
+
+INSERT INTO schema_migrations (version) VALUES ('20170712174621');
+
+INSERT INTO schema_migrations (version) VALUES ('20170712182033');
+
+INSERT INTO schema_migrations (version) VALUES ('20170714172533');
+
+INSERT INTO schema_migrations (version) VALUES ('20170714195436');
+
+INSERT INTO schema_migrations (version) VALUES ('20170716180758');
+
+INSERT INTO schema_migrations (version) VALUES ('20170716202346');
 
