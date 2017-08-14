@@ -1,6 +1,11 @@
 module PublicApi::Es
   class TimeToExitController < PublicController
     def index
+      # Part of AHAR
+      # Part of system performance
+      # Grouped - < 1 weeek, 30 days, 60 days, 90 days, 180 days, 12 months, 18, month
+      # What counts as an exit? Completely exited from ES, only look at clients with an exit to non-unknown/refused destination
+      # Bed-night for the count, not entry exit
       times_to_exit = [{title: "My first dataset", data: {
         "Jan 2016": 2, "Feb 2016": 43, "Mar 2016": 13, "April 2016": 25, "May 2016": 30,
         "June 2016": 34, "July 2016": 76, "Aug 2016": 3, "Sep 2016": 41, "Oct 2016": 15, "Nov 2016": 0,

@@ -1,5 +1,6 @@
 module PublicApi::Rrh
   class TimeToHousingController < PublicController
+    # Exited during month and then look at folks who's exit is permanent housing
     def index
       data = [{title: "My first dataset", data: {
         "Jan 2016": 2, "Feb 2016": 43, "Mar 2016": 13, "April 2016": 25, "May 2016": 30,
