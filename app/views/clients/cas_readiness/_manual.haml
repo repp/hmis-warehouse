@@ -15,5 +15,6 @@
 
   = render 'vispdat', f: f
   = render 'window/clients/required_documents'
+  = render 'enrollment', f: f
   = render GrdaWarehouse::Config.get(:cas_available_method).to_s, f: f
   = f.submit value: 'Update CAS Info', class: 'btn btn-secondary'

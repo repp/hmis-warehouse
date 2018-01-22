@@ -9,17 +9,11 @@ module GrdaWarehouse::Hud
     include HudSharedScopes
     include HudChronicDefinition
 
-    has_many :client_files
-    has_many :vispdats, class_name: 'GrdaWarehouse::Vispdat::Base'
-    has_one :cas_project_client, class_name: 'Cas::ProjectClient', foreign_key: :id_in_data_source
-    has_one :cas_client, class_name: 'Cas::Client', through: :cas_project_client, source: :client
-
     self.table_name = 'Client'
     self.hud_key = 'PersonalID'
     acts_as_paranoid(column: :DateDeleted)
 
     CACHE_EXPIRY = if Rails.env.production? then 4.hours else 2.minutes end
-
 
     def self.hud_csv_headers(version: nil)
       [
@@ -68,6 +62,13 @@ module GrdaWarehouse::Hud
 
     belongs_to :data_source, inverse_of: :clients
     belongs_to :export, **hud_belongs(Export), inverse_of: :clients
+
+    has_many :client_files
+    has_many :vispdats, class_name: GrdaWarehouse::Vispdat::Base.name
+    has_one :cas_project_client, class_name: Cas::ProjectClient.name, foreign_key: :id_in_data_source
+    has_one :cas_client, class_name: Cas::Client.name, through: :cas_project_client, source: :client
+    has_many :cas_enrollments, class_name: GrdaWarehouse::CasEnrollment.name
+    has_many :cas_enrollment_enrollments, through: :cas_enrollments, source: :enrollment 
 
     has_one :warehouse_client_source, class_name: GrdaWarehouse::WarehouseClient.name, foreign_key: :source_id, inverse_of: :source
     has_many :warehouse_client_destination, class_name: GrdaWarehouse::WarehouseClient.name, foreign_key: :destination_id, inverse_of: :destination
@@ -1419,15 +1420,18 @@ module GrdaWarehouse::Hud
 
           # move any vi-spdats
           GrdaWarehouse::Vispdat::Base.where(client_id: prev_destination_client.id).update_all(client_id: self.id)
+
+          # Move any CAS APR Data
+          GrdaWarehouse::CasEnrollment.where(client_id:  prev_destination_client.id).update_all(client_id: self.id)
         end
-        # and invaldiate our own service history
+        # and invalidate our own service history
         force_full_service_history_rebuild
         # and invalidate any cache for these clients
         self.class.clear_view_cache(prev_destination_client.id)
       end
       self.class.clear_view_cache(self.id)
       self.class.clear_view_cache(other_client.id)
-      # un-match anyone who we just moved so they don't show up in the matching again until they'be been checked
+      # un-match anyone who we just moved so they don't show up in the matching again until they've been checked
       moved.each do |m|
         GrdaWarehouse::ClientMatch.where(source_client_id: m.id).destroy_all
         GrdaWarehouse::ClientMatch.where(destination_client_id: m.id).destroy_all

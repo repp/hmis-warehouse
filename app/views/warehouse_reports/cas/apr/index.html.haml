@@ -1,0 +1,67 @@
+- title = 'Coordinated Access System Annual Performance Report'
+- content_for :title, title
+%h1= title
+= render '/warehouse_reports/breadcrumbs', tab: 'cas-reports'
+.row
+  .col-sm-10
+    = render 'filter'
+  .col-sm-2
+    .pull-right
+      = link_to({format: :xlsx}.merge(params),{class: 'btn btn-secondary'}) do
+        Download Excel
+- if @missing.any?
+  .row
+    .col-sm-12.alert.alert-info
+      %h3 CAS Active - Missing Proxy Enrollments
+      %p The following clients are currently active in CAS, but do not yet have assigned proxy enrollments.
+      %table.table.table-condensed
+        %thead
+          %tr
+            %th Warehouse Client ID
+            %th First Name
+            %th Last Name
+        %tbody
+          - @missing.each do |client|
+            %tr
+              %td
+                = link_to client_path(client) do
+                  = client.id
+              %td
+                = link_to client_path(client) do
+                  = client.FirstName
+              %td
+                = link_to client_path(client) do
+                  = client.LastName
+
+.row
+  .col-sm-12
+    .warehouse-reports
+      %table.table.table-condensed.table-hover
+        %thead
+          %tr
+            %th Warehouse Client ID
+            %th First Name
+            %th Last Name
+            %th Entry Date
+            %th Exit Date
+          
+        %tbody
+          - if @cas_enrollments.empty?
+            %tr
+              %td.text-center{colspan: 8}
+                %em No Enrollments Found
+          - else
+            - @cas_enrollments.each do |cas_enrollment|
+              %tr
+                %td
+                  = link_to client_path(cas_enrollment.client) do
+                    = cas_enrollment.client.id
+                %td
+                  = link_to client_path(cas_enrollment.client) do
+                    = cas_enrollment.client.FirstName
+                %td
+                  = link_to client_path(cas_enrollment.client) do
+                    = cas_enrollment.client.LastName
+                %td= cas_enrollment.entry_date
+                %td= cas_enrollment.exit_date
+                

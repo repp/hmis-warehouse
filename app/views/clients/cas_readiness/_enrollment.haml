@@ -1,0 +1,32 @@
+.cas-readiness__enrollments
+  %h3 Assign Enrollment for CAS
+  %p You can use this section to choose an enrollment which will act as a proxy for the HUD Entry and Exit assessments for this client's participation in CAS.  When building a CAS APR, we'll use the Entry and Exit Assessments for the chosen enrollment, that fall within the date range chosen on the report.  Only one enrollment should be chosen per APR year.  If no exit date is given, we'll use the date on the Exit Assessment.
+  - if @enrollments.any?
+    %table.table.table-condensed
+      %thead
+        %tr
+          %th CAS Entry Date
+          %th CAS Exit Date
+          %th Project Type
+          %th Project
+          %th Entry Date
+          %th Exit Date
+      %tbody
+        - @enrollments.each do |enrollment|
+          - project = enrollment.project
+          - cas_enrollment = @cas_enrollments[enrollment.id]
+          %tr
+            %td
+              .input-group.date{data: {provide: :datepicker}}
+                = text_field_tag "readiness[enrollments][#{enrollment.id}][entry_date]", cas_enrollment&.entry_date, class: 'form-control'
+                %span.input-group-addon.icon-calendar
+            %td
+              .input-group.date{data: {provide: :datepicker}}
+                = text_field_tag "readiness[enrollments][#{enrollment.id}][exit_date]", cas_enrollment&.exit_date, class: 'form-control'
+                %span.input-group-addon.icon-calendar
+            %td
+              = project_type_label(project.ProjectType)
+              
+            %td= project.ProjectName
+            %td= enrollment.EntryDate
+            %td= enrollment&.exit&.ExitDate

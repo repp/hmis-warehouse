@@ -11,7 +11,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 20180115195008) do
+ActiveRecord::Schema.define(version: 20180122190528) do
 
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
@@ -280,6 +280,7 @@ ActiveRecord::Schema.define(version: 20180115195008) do
     t.integer  "HospitalNights"
     t.integer  "RunawayYouth"
     t.string   "processed_hash"
+    t.string   "processed_as"
   end
   add_index "Enrollment", ["DateCreated"], :name=>"enrollment_date_created", :using=>:btree
   add_index "Enrollment", ["DateDeleted"], :name=>"index_Enrollment_on_DateDeleted", :using=>:btree
@@ -726,6 +727,18 @@ ActiveRecord::Schema.define(version: 20180115195008) do
   add_index "api_client_data_source_ids", ["client_id"], :name=>"index_api_client_data_source_ids_on_client_id", :using=>:btree
   add_index "api_client_data_source_ids", ["data_source_id"], :name=>"index_api_client_data_source_ids_on_data_source_id", :using=>:btree
   add_index "api_client_data_source_ids", ["warehouse_id"], :name=>"index_api_client_data_source_ids_on_warehouse_id", :using=>:btree
+
+  create_table "cas_enrollments", force: :cascade do |t|
+    t.integer  "client_id"
+    t.integer  "enrollment_id"
+    t.date     "entry_date"
+    t.date     "exit_date"
+    t.datetime "created_at",    :null=>false
+    t.datetime "updated_at",    :null=>false
+    t.json     "history"
+  end
+  add_index "cas_enrollments", ["client_id"], :name=>"index_cas_enrollments_on_client_id", :using=>:btree
+  add_index "cas_enrollments", ["enrollment_id"], :name=>"index_cas_enrollments_on_enrollment_id", :using=>:btree
 
   create_table "cas_reports", force: :cascade do |t|
     t.integer  "client_id",                          :null=>false
@@ -1358,6 +1371,7 @@ ActiveRecord::Schema.define(version: 20180115195008) do
     t.integer  "HospitalNights"
     t.integer  "RunawayYouth"
     t.string   "processed_hash"
+    t.string   "processed_as"
     t.integer  "demographic_id"
     t.integer  "client_id"
   end
@@ -1373,18 +1387,18 @@ ActiveRecord::Schema.define(version: 20180115195008) do
     t.date    "first_date_in_program"
     t.date    "last_date_in_program"
     t.string  "enrollment_group_id",     :limit=>50
-    t.integer "age"
+    t.integer "age",                     :limit=>2
     t.integer "destination"
     t.string  "head_of_household_id",    :limit=>50
     t.string  "household_id",            :limit=>50
     t.integer "project_id"
-    t.integer "project_type"
+    t.integer "project_type",            :limit=>2
     t.integer "project_tracking_method"
     t.integer "organization_id"
     t.integer "housing_status_at_entry"
     t.integer "housing_status_at_exit"
-    t.integer "service_type"
-    t.integer "computed_project_type"
+    t.integer "service_type",            :limit=>2
+    t.integer "computed_project_type",   :limit=>2
     t.boolean "presented_as_individual"
   end
   add_index "recent_service_history", ["client_id"], :name=>"client_id_rsh_index", :using=>:btree
@@ -1937,6 +1951,130 @@ SELECT "Services"."ServicesID",
   add_index "report_tokens", ["contact_id"], :name=>"index_report_tokens_on_contact_id", :using=>:btree
   add_index "report_tokens", ["report_id"], :name=>"index_report_tokens_on_report_id", :using=>:btree
 
+  create_table "service_history_enrollments", force: :cascade do |t|
+    t.integer "client_id",                       :null=>false
+    t.integer "data_source_id"
+    t.date    "date",                            :null=>false
+    t.date    "first_date_in_program",           :null=>false
+    t.date    "last_date_in_program"
+    t.string  "enrollment_group_id",             :limit=>50
+    t.string  "project_id",                      :limit=>50
+    t.integer "age",                             :limit=>2
+    t.integer "destination"
+    t.string  "head_of_household_id",            :limit=>50
+    t.string  "household_id",                    :limit=>50
+    t.string  "project_name",                    :limit=>150
+    t.integer "project_type",                    :limit=>2
+    t.integer "project_tracking_method"
+    t.string  "organization_id",                 :limit=>50
+    t.string  "record_type",                     :limit=>50, :null=>false
+    t.integer "housing_status_at_entry"
+    t.integer "housing_status_at_exit"
+    t.integer "service_type",                    :limit=>2
+    t.integer "computed_project_type",           :limit=>2
+    t.boolean "presented_as_individual"
+    t.integer "other_clients_over_25",           :limit=>2, :default=>0, :null=>false
+    t.integer "other_clients_under_18",          :limit=>2, :default=>0, :null=>false
+    t.integer "other_clients_between_18_and_25", :limit=>2, :default=>0, :null=>false
+    t.boolean "unaccompanied_youth",             :default=>false, :null=>false
+    t.boolean "parenting_youth",                 :default=>false, :null=>false
+    t.boolean "parenting_juvenile",              :default=>false, :null=>false
+    t.boolean "children_only",                   :default=>false, :null=>false
+    t.boolean "individual_adult",                :default=>false, :null=>false
+    t.boolean "individual_elder",                :default=>false, :null=>false
+    t.boolean "head_of_household",               :default=>false, :null=>false
+  end
+  add_index "service_history_enrollments", ["client_id", "record_type"], :name=>"index_she_on_client_id", :using=>:btree
+  add_index "service_history_enrollments", ["computed_project_type", "record_type", "client_id"], :name=>"index_she_on_computed_project_type", :using=>:btree
+  add_index "service_history_enrollments", ["data_source_id", "project_id", "organization_id", "record_type"], :name=>"index_she_ds_proj_org_r_type", :using=>:btree
+  add_index "service_history_enrollments", ["date", "household_id", "record_type"], :name=>"index_she_on_household_id", :using=>:btree
+  add_index "service_history_enrollments", ["date", "record_type", "presented_as_individual"], :name=>"index_she_date_r_type_indiv", :using=>:btree
+  add_index "service_history_enrollments", ["enrollment_group_id", "project_tracking_method"], :name=>"index_she__enrollment_id_track_meth", :using=>:btree
+  add_index "service_history_enrollments", ["first_date_in_program", "last_date_in_program", "record_type", "date"], :name=>"index_she_on_last_date_in_program", :using=>:btree
+  add_index "service_history_enrollments", ["first_date_in_program"], :name=>"index_she_on_first_date_in_program", :using=>:brin
+  add_index "service_history_enrollments", ["record_type", "date", "data_source_id", "organization_id", "project_id", "project_type", "project_tracking_method"], :name=>"index_she_date_ds_org_proj_proj_type", :using=>:btree
+
+  create_table "service_history_services", force: :cascade do |t|
+    t.integer "service_history_enrollment_id", :null=>false
+    t.string  "record_type",                   :limit=>50, :null=>false
+    t.date    "date",                          :null=>false
+    t.integer "age",                           :limit=>2
+    t.integer "service_type",                  :limit=>2
+  end
+  add_index "service_history_services", ["date", "service_history_enrollment_id"], :name=>"index_shs_date_en_id", :using=>:btree
+  add_index "service_history_services", ["service_history_enrollment_id", "date"], :name=>"index_shs_en_id_date", :using=>:btree
+
+  create_view "service_history", <<-'END_VIEW_SERVICE_HISTORY', :force => true
+SELECT service_history_services.id,
+    service_history_enrollments.client_id,
+    service_history_enrollments.data_source_id,
+    service_history_services.date,
+    service_history_enrollments.first_date_in_program,
+    service_history_enrollments.last_date_in_program,
+    service_history_enrollments.enrollment_group_id,
+    service_history_enrollments.project_id,
+    service_history_services.age,
+    service_history_enrollments.destination,
+    service_history_enrollments.head_of_household_id,
+    service_history_enrollments.household_id,
+    service_history_enrollments.project_name,
+    service_history_enrollments.project_type,
+    service_history_enrollments.project_tracking_method,
+    service_history_enrollments.organization_id,
+    service_history_services.record_type,
+    service_history_enrollments.housing_status_at_entry,
+    service_history_enrollments.housing_status_at_exit,
+    service_history_services.service_type,
+    service_history_enrollments.computed_project_type,
+    service_history_enrollments.presented_as_individual,
+    service_history_enrollments.other_clients_over_25,
+    service_history_enrollments.other_clients_under_18,
+    service_history_enrollments.other_clients_between_18_and_25,
+    service_history_enrollments.unaccompanied_youth,
+    service_history_enrollments.parenting_youth,
+    service_history_enrollments.parenting_juvenile,
+    service_history_enrollments.children_only,
+    service_history_enrollments.individual_adult,
+    service_history_enrollments.individual_elder,
+    service_history_enrollments.head_of_household
+   FROM (service_history_services
+     JOIN service_history_enrollments ON ((service_history_services.service_history_enrollment_id = service_history_enrollments.id)))
+UNION
+ SELECT service_history_enrollments.id,
+    service_history_enrollments.client_id,
+    service_history_enrollments.data_source_id,
+    service_history_enrollments.date,
+    service_history_enrollments.first_date_in_program,
+    service_history_enrollments.last_date_in_program,
+    service_history_enrollments.enrollment_group_id,
+    service_history_enrollments.project_id,
+    service_history_enrollments.age,
+    service_history_enrollments.destination,
+    service_history_enrollments.head_of_household_id,
+    service_history_enrollments.household_id,
+    service_history_enrollments.project_name,
+    service_history_enrollments.project_type,
+    service_history_enrollments.project_tracking_method,
+    service_history_enrollments.organization_id,
+    service_history_enrollments.record_type,
+    service_history_enrollments.housing_status_at_entry,
+    service_history_enrollments.housing_status_at_exit,
+    service_history_enrollments.service_type,
+    service_history_enrollments.computed_project_type,
+    service_history_enrollments.presented_as_individual,
+    service_history_enrollments.other_clients_over_25,
+    service_history_enrollments.other_clients_under_18,
+    service_history_enrollments.other_clients_between_18_and_25,
+    service_history_enrollments.unaccompanied_youth,
+    service_history_enrollments.parenting_youth,
+    service_history_enrollments.parenting_juvenile,
+    service_history_enrollments.children_only,
+    service_history_enrollments.individual_adult,
+    service_history_enrollments.individual_elder,
+    service_history_enrollments.head_of_household
+   FROM service_history_enrollments
+  END_VIEW_SERVICE_HISTORY
+
   create_table "taggings", force: :cascade do |t|
     t.integer  "tag_id"
     t.integer  "taggable_id"
@@ -2207,6 +2345,7 @@ SELECT "Services"."ServicesID",
   add_foreign_key "Site", "data_sources"
   add_foreign_key "files", "vispdats"
   add_foreign_key "import_logs", "data_sources"
+  add_foreign_key "service_history_services", "service_history_enrollments", on_delete: :cascade
   add_foreign_key "warehouse_clients", "\"Client\"", column: "destination_id"
   add_foreign_key "warehouse_clients", "\"Client\"", column: "source_id"
   add_foreign_key "warehouse_clients", "data_sources"

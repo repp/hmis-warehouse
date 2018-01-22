@@ -143,6 +143,9 @@ module GrdaWarehouse::Hud
     has_many :service_histories, class_name: GrdaWarehouse::ServiceHistory.name, foreign_key: [:data_source_id, :enrollment_group_id, :project_id], primary_key: [:data_source_id, :ProjectEntryID, :ProjectID], inverse_of: :enrollment
     has_one :service_history_entry, -> {where(record_type: :entry)}, class_name: GrdaWarehouse::ServiceHistory.name, foreign_key: [:data_source_id, :enrollment_group_id, :project_id], primary_key: [:data_source_id, :ProjectEntryID, :ProjectID]
 
+    has_many :cas_enrollments, class_name: GrdaWarehouse::CasEnrollment.name
+    has_many :cas_enrollment_clients, through: :cas_enrollments, source: :client
+
     scope :residential, -> do
       joins(:project).merge(Project.residential)
     end
@@ -192,6 +195,9 @@ module GrdaWarehouse::Hud
     scope :open_on_date, -> (date=Date.today) do
       range = ::Filters::DateRange.new(start: date, end: date)
       open_during_range(range)
+    end
+    scope :ongoing, -> do
+      open_on_date
     end
 
     ADDRESS_FIELDS = %w( LastPermanentStreet LastPermanentCity LastPermanentState LastPermanentZIP ).map(&:to_sym).freeze

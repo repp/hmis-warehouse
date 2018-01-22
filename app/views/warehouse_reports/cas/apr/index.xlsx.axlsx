@@ -1,0 +1,20 @@
+wb = xlsx_package.workbook
+wb.add_worksheet(name: "CAS APR") do |sheet|
+  title = sheet.styles.add_style(sz: 12, b: true, alignment: {horizontal: :center})
+  sheet.add_row([
+    'Warehouse Client ID',
+    'First Name',
+    'Last Name',
+    'Entry Date',
+    'Exit Date',
+  ])
+  @cas_enrollments.each do |cas_enrollment|
+    sheet.add_row([
+      cas_enrollment.client.id,
+      cas_enrollment.client.FirstName,
+      cas_enrollment.client.LastName,
+      cas_enrollment.entry_date,
+      cas_enrollment.exit_date,
+    ])
+  end
+end

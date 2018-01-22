@@ -379,3 +379,7 @@ $client-match-action-row-height: 22px;
   display: inline-block;
   padding: 0.5em 0.5em;
 }
+.cas-readiness__enrollments
+{
+  border-bottom: 1px solid $gray-030;
+}

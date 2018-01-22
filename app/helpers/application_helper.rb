@@ -138,4 +138,12 @@ module ApplicationHelper
     translations[locale.to_sym].presence || locale
   end
 
+  # pass this an integer that HUD.project_type recognizes
+  def project_type_label project_type
+    content_tag :div, class: "enrollment__project_type client__service_type_#{project_type}" do
+      content_tag :em, class: 'service-type__program-type', data: {toggle: :tooltip, title: HUD.project_type(project_type)} do
+          HUD.project_type_brief(project_type)
+      end
+    end
+  end
 end
