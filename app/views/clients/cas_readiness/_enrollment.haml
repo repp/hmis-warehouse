@@ -1,5 +1,5 @@
 .cas-readiness__enrollments
-  %h3 Assign Enrollment for CAS
+  %h3 Assign Enrollment Proxy for CAS
   %p You can use this section to choose an enrollment which will act as a proxy for the HUD Entry and Exit assessments for this client's participation in CAS.  When building a CAS APR, we'll use the Entry and Exit Assessments for the chosen enrollment, that fall within the date range chosen on the report.  Only one enrollment should be chosen per APR year.  If no exit date is given, we'll use the date on the Exit Assessment.
   - if @enrollments.any?
     %table.table.table-condensed
