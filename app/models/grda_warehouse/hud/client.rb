@@ -65,8 +65,8 @@ module GrdaWarehouse::Hud
 
     has_many :client_files
     has_many :vispdats, class_name: GrdaWarehouse::Vispdat::Base.name
-    has_one :cas_project_client, class_name: Cas::ProjectClient.name, foreign_key: :id_in_data_source
-    has_one :cas_client, class_name: Cas::Client.name, through: :cas_project_client, source: :client
+    has_one :cas_project_client, class_name: 'Cas::ProjectClient', foreign_key: :id_in_data_source
+    has_one :cas_client, class_name: 'Cas::Client', through: :cas_project_client, source: :client
     has_many :cas_enrollments, class_name: GrdaWarehouse::CasEnrollment.name
     has_many :cas_enrollment_enrollments, through: :cas_enrollments, source: :enrollment 
 
