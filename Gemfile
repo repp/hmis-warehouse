@@ -140,7 +140,6 @@ group :development do
   gem 'bundler-audit', require: false
   gem 'capistrano-bundler'
   gem 'capistrano-rvm'
-  gem 'capistrano-passenger'
   gem 'capistrano-rails'
   gem 'capistrano3-delayed-job', '~> 1.0'
   gem 'rails-erd'

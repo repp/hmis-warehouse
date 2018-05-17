@@ -27,7 +27,8 @@ end
 
 if ENV['DELAYED_JOB_SYSTEMD']=='true'
   unless ENV['SKIP_JOBS']=='true'
-    after 'passenger:restart', 'delayed_job:restart'
+    # Only need the app for its db structure no server running
+    #after 'passenger:restart', 'delayed_job:restart'
   end
 else
   set :delayed_job_prefix, "#{ENV['CLIENT']}-hmis"
@@ -48,7 +49,8 @@ task :group_writable do
     execute "chgrp --quiet ubuntu -R #{fetch(:deploy_to)} || echo ok"
   end
 end
-after 'passenger:restart', :group_writable
+# Only need the app for its db structure no server running
+#after 'passenger:restart', :group_writable
 
 # Default branch is :master
 # ask :branch, `git rev-parse --abbrev-ref HEAD`.chomp
