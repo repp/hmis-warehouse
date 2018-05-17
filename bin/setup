@@ -22,7 +22,7 @@ Dir.chdir APP_ROOT do
     end
   end
   puts "\n== Using a simple .env file =="
-  FileUtils.cp 'sample.env', '.env' unless Rails.env =~ /production|staging/
+  FileUtils.cp 'sample.env', '.env'
 
   puts "\n== Preparing Database =="
   system "bundle exec rake db:create"

@@ -1,8 +1,8 @@
 # config valid only for current version of Capistrano
 lock '3.10.2'
 
-set :application, 'boston_hmis'
-set :repo_url, 'git@github.com:greenriver/hmis-warehouse.git'
+set :application, 'slc_hmis'
+set :repo_url, 'git@github.com:repp/hmis-warehouse.git'
 set :client, ENV.fetch('CLIENT')
 
 set :whenever_identifier, ->{ "#{fetch(:application)}_#{fetch(:stage)}" }
