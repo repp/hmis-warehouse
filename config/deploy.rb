@@ -25,6 +25,10 @@ else
   }
 end
 
+set :nginx_ssl_certificate, "/var/www/slc-hmis-staging/current/certificates/saltlakecounty-warehouse.brighthive.io-cert.pem"
+set :nginx_ssl_certificate_key, "/var/www/slc-hmis-staging/current/certificates/saltlakecounty-warehouse.brighthive.io-key.pem"
+set :nginx_use_ssl, true
+
 unless ENV['SKIP_JOBS']=='true'
   after 'puma:restart', 'delayed_job:restart'
 end
