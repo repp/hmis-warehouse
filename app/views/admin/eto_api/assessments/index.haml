@@ -11,13 +11,16 @@
       %th Fetch into Warehouse
       %th Display as confidential
       %th Exclude from Window
+      %th Details visible in the window with release
+      %th Health
   %tbody
     - @assessments.each do |assessment|
       %tr
         %td
           = assessment.site_name
         %td
-          = assessment.name
+          = link_to edit_admin_eto_api_assessment_path(assessment) do
+            = assessment.name    
         %td
           = assessment.assessment_id
         %td
@@ -28,3 +31,7 @@
           = checkmark(assessment.confidential)
         %td
           = checkmark(assessment.exclude_from_window)
+        %td
+          = checkmark(assessment.details_in_window_with_release)
+        %td
+          = checkmark(assessment.health)

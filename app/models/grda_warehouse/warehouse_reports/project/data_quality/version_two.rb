@@ -87,13 +87,18 @@ module GrdaWarehouse::WarehouseReports::Project::DataQuality
         if project.TrackingMethod == 3
           enrollments_in_project = enrollments_for_project(
             project.ProjectID, project.data_source_id
-          ).values.flatten(1).group_by do |row|
-            [row[:data_source_id], row[:enrollment_group_id]]
+          )&.values&.flatten(1)
+          if enrollments_in_project.present? && enrollments_in_project.any?
+            enrollments_in_project = enrollments_in_project.group_by do |row|
+              [row[:data_source_id], row[:enrollment_group_id]]
+            end
+            enrollment_groups = enrollments_in_project.keys.map(&:last)
+            services = GrdaWarehouse::Hud::Service.where(ProjectEntryID: enrollment_groups).distinct.pluck(:data_source_id, :ProjectEntryID)
+            empties = enrollments_in_project.keys - services
+            empty_enrollments[project.id] = enrollments_in_project.values_at(*empties)
+          else
+            empty_enrollments[project.id] = []
           end
-          enrollment_groups = enrollments_in_project.keys.map(&:last)
-          services = GrdaWarehouse::Hud::Service.where(ProjectEntryID: enrollment_groups).distinct.pluck(:data_source_id, :ProjectEntryID)
-          empties = enrollments_in_project.keys - services
-          empty_enrollments[project.id] = enrollments_in_project.values_at(*empties)
         else
           empty_enrollments[project.id] = []
         end
@@ -129,16 +134,20 @@ module GrdaWarehouse::WarehouseReports::Project::DataQuality
       individuals = {}
       projects.each do |project|
         if project.serves_families?
-          family_enrollments = enrollments_for_project(
+          enrollments_in_project = enrollments_for_project(
             project.ProjectID, project.data_source_id
-          ).values.
-            flatten(1).
-            group_by do |m| 
-              [m[:data_source_id], m[:household_id]]
-            end.select do |(_, hh_id), m| 
-              hh_id.nil? || m.size == 1
-            end
-          individuals[project.id] = family_enrollments.values.flatten(1)
+          )&.values&.flatten(1)
+          if enrollments_in_project.present? && enrollments_in_project.any?
+            family_enrollments = enrollments_in_project.
+              group_by do |m| 
+                [m[:data_source_id], m[:household_id]]
+              end.select do |(_, hh_id), m| 
+                hh_id.nil? || m.size == 1
+              end
+            individuals[project.id] = family_enrollments.values.flatten(1)
+          else
+            individuals[project.id] = []
+          end
         else
           individuals[project.id] = []
         end
@@ -171,19 +180,21 @@ module GrdaWarehouse::WarehouseReports::Project::DataQuality
       families = {}
       projects.each do |project|
         if project.serves_only_individuals?
-          family_enrollments = enrollments_for_project(
-            project.ProjectID, project.data_source_id
-          ).values.
-            flatten(1).
-            group_by do |m| 
-              [m[:data_source_id], m[:household_id]]
-            end.select do |(_, hh_id), m|
-              unique_clients = m.map do |enrollment|
-                enrollment[:id]
-              end.uniq
-              hh_id.present? && unique_clients.size > 1
-            end
+          enrollments_in_project = enrollments_for_project(project.ProjectID, project.data_source_id)&.values&.flatten(1)
+          if enrollments_in_project.present? && enrollments_in_project.any?
+            family_enrollments = enrollments_in_project.
+              group_by do |m| 
+                [m[:data_source_id], m[:household_id]]
+              end.select do |(_, hh_id), m|
+                unique_clients = m.map do |enrollment|
+                  enrollment[:id]
+                end.uniq
+                hh_id.present? && unique_clients.size > 1
+              end
             families[project.id] = family_enrollments.values.flatten(1)
+          else
+            families[project.id] = []
+          end
         else
           families[project.id] = []
         end
@@ -321,8 +332,8 @@ module GrdaWarehouse::WarehouseReports::Project::DataQuality
       dob_entry = {}
       projects.each do |project|
         dob_entry[project.id] ||= Set.new
-        enrollments_in_project = enrollments_for_project(project.ProjectID, project.data_source_id).values.flatten(1)
-        if enrollments_in_project.any?
+        enrollments_in_project = enrollments_for_project(project.ProjectID, project.data_source_id)&.values&.flatten(1)
+        if enrollments_in_project.present? && enrollments_in_project.any?
           enrollments_in_project.each do |enrollment|
             if enrollment[:dob].present? && enrollment[:dob].to_date >= enrollment[:first_date_in_program].to_date
               dob_entry[project.id] << [
@@ -446,7 +457,7 @@ module GrdaWarehouse::WarehouseReports::Project::DataQuality
       totals = {}
       answers = {project_missing: {}}
       support = {}
-      self.class.missing_refused_names.each do |word|
+      self.class.missing_refused_names.keys.each do |word|
         totals["missing_#{word}"] = Set.new
         totals["refused_#{word}"] = Set.new
         totals["unknown_#{word}"] = Set.new
@@ -454,7 +465,7 @@ module GrdaWarehouse::WarehouseReports::Project::DataQuality
       
       projects.each do |project|
         counts = {}
-        self.class.missing_refused_names.each do |word|
+        self.class.missing_refused_names.keys.each do |word|
           counts["missing_#{word}"] = Set.new
           counts["refused_#{word}"] = Set.new
           counts["unknown_#{word}"] = Set.new
@@ -466,7 +477,7 @@ module GrdaWarehouse::WarehouseReports::Project::DataQuality
           counts = add_unknown_demo(client: client, counts: counts)
         end
         enrollments_in_project = enrollments_for_project(project.ProjectID, project.data_source_id)
-        if enrollments_in_project.any?
+        if enrollments_in_project.present? && enrollments_in_project.any?
           enrollments_in_project.each do |client_id, enrollments|
             if enrollments.present?
               enrollments.each do |enrollment|
@@ -476,7 +487,7 @@ module GrdaWarehouse::WarehouseReports::Project::DataQuality
               end
             end
             leavers_in_project = leavers_for_project(project.ProjectID, project.data_source_id)
-            if leavers_in_project.any?
+            if leavers_in_project.present? && leavers_in_project.any?
               leavers_in_project.each do |client_id|
                 enrollments_in_project[client_id].each do |enrollment|
                   counts = add_missing_destinations(client_id: client_id, enrollment: enrollment, counts: counts)
@@ -491,9 +502,10 @@ module GrdaWarehouse::WarehouseReports::Project::DataQuality
           totals[key] += value
           answers[:project_missing][project.id] ||= {}
           answers[:project_missing][project.id][key] = value.size
-          answers[:project_missing][project.id]["#{key}_percentage"] = in_percentage(value.size, clients_in_project.size) 
+          answers[:project_missing][project.id]["#{key}_percentage"] = in_percentage(value.size, clients_in_project.size)
+          header_key = key.to_s.gsub('missing_', '').gsub('refused_', '').gsub('unknown_', '').to_sym
           support["project_missing_#{project.id}_#{key}"] = {
-            headers: ['Client ID', 'First Name', 'Last Name', 'Name Data Quality', 'SSN', 'SSN Quality', 'DOB', 'DOB Quality'],
+            headers: self.class.missing_refused_names[header_key],
             counts: value.to_a.map do |row|
               # use the destination id for the client for support
               row[0] = destination_id_for_client(row.first)
@@ -508,7 +520,7 @@ module GrdaWarehouse::WarehouseReports::Project::DataQuality
           select(:client_id).
           distinct.
           count
-        missing_clients = counts.values.reduce(&:+)
+        missing_clients = counts.values.reduce(&:+).map(&:first).to_set
         totals[:total_missing] ||= Set.new
         totals[:total_missing] += missing_clients
         answers[:project_missing][project.id][:total_missing] = missing_clients.size
@@ -526,11 +538,12 @@ module GrdaWarehouse::WarehouseReports::Project::DataQuality
         select(:client_id).
         distinct.
         count
-      totals.each do |key, value|        
+      totals.each do |key, value|
+        header_key = key.to_s.gsub('missing_', '').gsub('refused_', '').gsub('unknown_', '').to_sym
         answers[:project_missing][:totals]["#{key}_percentage"] = in_percentage(value.size, clients.size)
         if ! [:total_open_enrollments, :total_missing, :clients_served_during_range].include?(key)
           support["project_missing_totals_#{key}"] = {
-            headers: ['Client ID', 'First Name', 'Last Name', 'Name Data Quality', 'SSN', 'SSN Quality', 'DOB', 'DOB Quality'],
+            headers: self.class.missing_refused_names[header_key],
             counts: value.to_a
           }
         end
@@ -540,158 +553,267 @@ module GrdaWarehouse::WarehouseReports::Project::DataQuality
     end
 
     def self.missing_refused_names
-      [
-        :name,
-        :ssn,
-        :dob,
-        :veteran,
-        :ethnicity,
-        :race,
-        :gender,
-        :disabling_condition,
-        :residence_prior,
-        :destination,
-        :last_permanent_zip,
-      ]
+      {
+        name: ['Client ID', 'First Name', 'Last Name', 'Name Data Quality'],
+        ssn: ['Client ID', 'First Name', 'Last Name', 'SSN', 'SSN Quality'],
+        dob: ['Client ID', 'First Name', 'Last Name', 'DOB', 'DOB Quality'],
+        veteran: ['Client ID', 'First Name', 'Last Name', 'Veteran Status'],
+        ethnicity: ['Client ID', 'First Name', 'Last Name', 'Ethnicity'],
+        race: ['Client ID', 'First Name', 'Last Name', 'Race None', 'AmIndAKNative', 'Asian', 'Black or African American', 'Native HI Other Pacific', 'White'],
+        gender: ['Client ID', 'First Name', 'Last Name', 'Gender'],
+        disabling_condition: ['Client ID', 'First Name', 'Last Name', 'Disability Type', 'Disability Response'],
+        residence_prior: ['Client ID', 'First Name', 'Last Name', 'Prior Residence'],
+        destination: ['Client ID', 'First Name', 'Last Name', 'Destination'],
+        # last_permanent_zip: ['Client ID', 'First Name', 'Last Name', 'Last Permanent Zip'],
+      }
     end
     
+    def base_colums_for_support enrollment
+      [
+        enrollment[:id], 
+        enrollment[:first_name], 
+        enrollment[:last_name], 
+      ]
+    end
+
     def columns_for_missing_support enrollment
-      [enrollment[:id], enrollment[:first_name], enrollment[:last_name], enrollment[:name_data_quality], enrollment[:ssn], enrollment[:ssn_data_quality], enrollment[:dob], enrollment[:dob_data_quality]]
+      base_colums_for_support(enrollment) + [
+        enrollment[:name_data_quality], 
+        enrollment[:ssn], 
+        enrollment[:ssn_data_quality], 
+        enrollment[:dob], 
+        enrollment[:dob_data_quality],
+      ]
+    end
+
+    def columns_for_destination_support enrollment
+      base_colums_for_support(enrollment) + [
+        enrollment[:destination]
+      ]
+    end
+
+    # this may return multiple rows per client and must be added to the support
+    # stack with += instead of <<
+    def columns_for_disabling_condition_support enrollment, disabilities, value
+      if disabilities.blank?
+        [base_colums_for_support(enrollment) + [
+          nil,
+          nil,
+        ]]
+      else
+        disabilities.select do |dis|
+          dis[:disability_response].to_i == value
+        end.map do |dis|
+          base_colums_for_support(enrollment) + [
+          HUD.disability_type(dis[:disability_type]),
+          dis[:disability_response],
+        ]
+        end
+      end
+    end
+
+    def columns_for_gender_support enrollment
+      base_colums_for_support(enrollment) + [
+        enrollment[:gender]
+      ]
+    end
+
+    def columns_for_veteran_support enrollment
+      base_colums_for_support(enrollment) + [
+        enrollment[:veteran_status]
+      ]
+    end
+
+    def columns_for_name_support enrollment
+      base_colums_for_support(enrollment) + [
+        enrollment[:name_data_quality]
+      ]
+    end
+
+    def columns_for_ssn_support enrollment
+      base_colums_for_support(enrollment) + [
+        enrollment[:ssn],
+        enrollment[:ssn_data_quality],
+      ]
+    end
+
+    def columns_for_dob_support enrollment
+      base_colums_for_support(enrollment) + [
+        enrollment[:dob],
+        enrollment[:dob_data_quality],
+      ]
+    end
+
+    def columns_for_ethnicity_support enrollment
+      base_colums_for_support(enrollment) + [
+        enrollment[:ethnicity]
+      ]
+    end
+
+    def columns_for_residence_prior_support enrollment
+      base_colums_for_support(enrollment) + [
+        enrollment[:residence_prior]
+      ]
+    end
+
+    # def columns_for_last_permanent_zip_support enrollment
+    #   base_colums_for_support(enrollment) + [
+    #     enrollment[:last_permanent_zip]
+    #   ]
+    # end
+
+    def columns_for_race_support enrollment
+      base_colums_for_support(enrollment) + [
+        enrollment[:race_none], 
+        enrollment[:am_ind_ak_native], 
+        enrollment[:asian], 
+        enrollment[:black_af_american], 
+        enrollment[:native_hi_other_pacific], 
+        enrollment[:white],
+      ]
     end
 
 
     def add_missing_destinations client_id:, enrollment:, counts:
       if missing?(enrollment[:destination])
-        counts['missing_destination'] << columns_for_missing_support(enrollment)
+        counts['missing_destination'] << columns_for_destination_support(enrollment)
       end
       return counts
     end
     
     def add_refused_destinations client_id:, enrollment:, counts:
       if refused?(enrollment[:destination])
-        counts['refused_destination'] << columns_for_missing_support(enrollment)
+        counts['refused_destination'] << columns_for_destination_support(enrollment)
       end
       return counts
     end
     
     def add_unknown_destinations client_id:, enrollment:, counts:
       if unknown?(enrollment[:destination])
-        counts['unknown_destination'] << columns_for_missing_support(enrollment)
+        counts['unknown_destination'] << columns_for_destination_support(enrollment)
       end
       return counts
     end
 
     def add_missing_enrollment client_id:, enrollment:, counts:
-      if missing?(enrollment[:disabling_condition])
-        counts['missing_disabling_condition'] << columns_for_missing_support(enrollment)
+      disabilities = disabilities_for_enrollment(enrollment)
+      if missing_disability?(disabilities)
+        counts['missing_disabling_condition'] += columns_for_disabling_condition_support(enrollment, disabilities, 99)
       end
       if missing?(enrollment[:residence_prior])
-        counts['missing_residence_prior'] << columns_for_missing_support(enrollment)
+        counts['missing_residence_prior'] << columns_for_residence_prior_support(enrollment)
       end
-      if missing?(enrollment[:last_permanent_zip])
-        counts['missing_last_permanent_zip'] << columns_for_missing_support(enrollment)
-      end
+      # if missing?(enrollment[:last_permanent_zip])
+      #   counts['missing_last_permanent_zip'] << columns_for_last_permanent_zip_support(enrollment)
+      # end
       return counts
     end
 
     def add_refused_enrollment client_id:, enrollment:, counts:
-      if refused?(enrollment[:disabling_condition])
-        counts['refused_disabling_condition'] << columns_for_missing_support(enrollment)
+      disabilities = disabilities_for_enrollment(enrollment)
+      if refused_diability?(disabilities)
+        counts['refused_disabling_condition'] += columns_for_disabling_condition_support(enrollment, disabilities, 9)
       end
       if refused?(enrollment[:residence_prior])
-        counts['refused_residence_prior'] << columns_for_missing_support(enrollment)
+        counts['refused_residence_prior'] << columns_for_residence_prior_support(enrollment)
       end
-      if refused?(enrollment[:last_permanent_zip])
-        counts['refused_last_permanent_zip'] << columns_for_missing_support(enrollment)
-      end
+      # if refused?(enrollment[:last_permanent_zip])
+      #   counts['refused_last_permanent_zip'] << columns_for_last_permanent_zip_support(enrollment)
+      # end
       return counts
     end
 
     def add_unknown_enrollment client_id:, enrollment:, counts:
-      if unknown?(enrollment[:disabling_condition])
-        counts['unknown_disabling_condition'] << columns_for_missing_support(enrollment)
+      disabilities = disabilities_for_enrollment(enrollment)
+      if unknown_disability?(disabilities)
+        counts['unknown_disabling_condition'] += columns_for_disabling_condition_support(enrollment, disabilities, 8)
       end
       if unknown?(enrollment[:residence_prior])
-        counts['unknown_residence_prior'] << columns_for_missing_support(enrollment)
+        counts['unknown_residence_prior'] << columns_for_residence_prior_support(enrollment)
       end
-      if unknown?(enrollment[:last_permanent_zip])
-        counts['unknown_last_permanent_zip'] << columns_for_missing_support(enrollment)
-      end
+      # if unknown?(enrollment[:last_permanent_zip])
+      #   counts['unknown_last_permanent_zip'] << columns_for_last_permanent_zip_support(enrollment)
+      # end
       return counts
     end
 
     def add_missing_demo client:, counts:
-      if client[:first_name].blank? || client[:last_name].blank? || missing?(client[:name_data_quality])
-        counts['missing_name'] << columns_for_missing_support(client)
+      alternate_clients = source_clients_for_source_client(source_client_id: client[:destination_id], data_source_id: client[:data_source_id])
+      if alternate_clients.map{|m| m[:first_name]}.all?(&:blank?) || alternate_clients.map{|m| m[:last_name]}.all?(&:blank?) || alternate_clients.map{|m| missing?(m[:name_data_quality])}.all?
+        counts['missing_name'] << columns_for_name_support(client)
       end
-      if client[:ssn].blank? || missing?(client[:ssn_data_quality])
-        counts['missing_ssn'] << columns_for_missing_support(client)
+      if alternate_clients.map{|m| m[:ssn]}.all?(&:blank?) || alternate_clients.map{|m| missing?(m[:ssn_data_quality])}.all?
+        counts['missing_ssn'] << columns_for_ssn_support(client)
       end
-      if client[:dob].blank? || missing?(client[:dob_data_quality])
-        counts['missing_dob'] << columns_for_missing_support(client)
+      if alternate_clients.map{|m| m[:dob]}.all?(&:blank?) || alternate_clients.map{|m| missing?(m[:dob_data_quality])}.all?
+        counts['missing_dob'] << columns_for_dob_support(client)
       end
-      if client[:veteran_status].blank? || missing?(client[:veteran_status])
-        counts['missing_veteran'] << columns_for_missing_support(client)
+      if alternate_clients.map{|m| m[:veteran_status]}.all?(&:blank?) || alternate_clients.map{|m| missing?(m[:veteran_status])}.all?
+        counts['missing_veteran'] << columns_for_veteran_support(client)
       end
-      if client[:ethnicity].blank? || missing?(client[:ethnicity])
-        counts['missing_ethnicity'] << columns_for_missing_support(client)
+      if alternate_clients.map{|m| m[:ethnicity]}.all?(&:blank?) || alternate_clients.map{|m| missing?(m[:ethnicity])}.all?
+        counts['missing_ethnicity'] << columns_for_ethnicity_support(client)
       end
       # If we have no race info, whatsoever
-      if missing?(client[:race_none]) && missing?(client[:am_ind_ak_native]) && missing?(client[:asian]) && missing?(client[:black_af_american]) && missing?(client[:native_hi_other_pacific]) && missing?(client[:white])
-        counts['missing_race'] << columns_for_missing_support(client)
+      if alternate_clients.map{|m| missing?(m[:race_none])}.all? && alternate_clients.map{|m| missing?(m[:am_ind_ak_native])}.all? &&
+        alternate_clients.map{|m| missing?(m[:asian])}.all? && alternate_clients.map{|m| missing?(m[:black_af_american])}.all? &&
+        alternate_clients.map{|m| missing?(m[:native_hi_other_pacific])}.all? && alternate_clients.map{|m| missing?(m[:white])}.all?
+        counts['missing_race'] << columns_for_race_support(client)
       end
-      if client[:gender].blank? || missing?(client[:gender])
-        counts['missing_gender'] << columns_for_missing_support(client)
+      if alternate_clients.map{|m| m[:gender]}.all?(&:blank?) || alternate_clients.map{|m| missing?(m[:gender])}.all?
+        counts['missing_gender'] << columns_for_gender_support(client)
       end
       return counts
     end
 
     def add_refused_demo client:, counts:
-      if refused?(client[:name_data_quality])
-        counts['refused_name'] << columns_for_missing_support(client)
+      alternate_clients = source_clients_for_source_client(source_client_id: client[:destination_id], data_source_id: client[:data_source_id])
+      if alternate_clients.map{|m| refused?(m[:name_data_quality])}.all?
+        counts['refused_name'] << columns_for_name_support(client)
       end
-      if refused?(client[:ssn_data_quality])
-        counts['refused_ssn'] << columns_for_missing_support(client)
+      if alternate_clients.map{|m| refused?(m[:ssn_data_quality])}.all?
+        counts['refused_ssn'] << columns_for_ssn_support(client)
       end
-      if refused?(client[:dob_data_quality])
-        counts['refused_dob'] << columns_for_missing_support(client)
+      if alternate_clients.map{|m| refused?(m[:dob_data_quality])}.all?
+        counts['refused_dob'] << columns_for_dob_support(client)
       end
-      if refused?(client[:veteran_status])
-        counts['refused_veteran'] << columns_for_missing_support(client)
+      if alternate_clients.map{|m| refused?(m[:veteran_status])}.all?
+        counts['refused_veteran'] << columns_for_veteran_support(client)
       end
-      if refused?(client[:ethnicity])
-        counts['refused_ethnicity'] << columns_for_missing_support(client)
+      if alternate_clients.map{|m| refused?(m[:ethnicity])}.all?
+        counts['refused_ethnicity'] << columns_for_ethnicity_support(client)
       end
-      if refused?(client[:race_none])
-        counts['refused_race'] << columns_for_missing_support(client)
+      if alternate_clients.map{|m| refused?(m[:race_none])}.all?
+        counts['refused_race'] << columns_for_race_support(client)
       end
-      if refused?(client[:gender])
-        counts['refused_gender'] << columns_for_missing_support(client)
+      if alternate_clients.map{|m| refused?(m[:gender])}.all?
+        counts['refused_gender'] << columns_for_gender_support(client)
       end
       return counts
     end
 
     def add_unknown_demo client:, counts:
-      if unknown?(client[:name_data_quality])
-        counts['unknown_name'] << columns_for_missing_support(client)
+      alternate_clients = source_clients_for_source_client(source_client_id: client[:destination_id], data_source_id: client[:data_source_id])
+      if alternate_clients.map{|m| unknown?(m[:name_data_quality])}.all?
+        counts['unknown_name'] << columns_for_name_support(client)
       end
-      if unknown?(client[:ssn_data_quality])
-        counts['unknown_ssn'] << columns_for_missing_support(client)
+      if alternate_clients.map{|m| unknown?(m[:ssn_data_quality])}.all?
+        counts['unknown_ssn'] << columns_for_ssn_support(client)
       end
-      if unknown?(client[:dob_data_quality])
-        counts['unknown_dob'] << columns_for_missing_support(client)
+      if alternate_clients.map{|m| unknown?(m[:dob_data_quality])}.all?
+        counts['unknown_dob'] << columns_for_dob_support(client)
       end
-      if unknown?(client[:veteran_status])
+      if alternate_clients.map{|m| unknown?(m[:veteran_status])}.all?
         counts['unknown_veteran'] << columns_for_missing_support(client)
       end
-      if unknown?(client[:ethnicity])
-        counts['unknown_ethnicity'] << columns_for_missing_support(client)
+      if alternate_clients.map{|m| unknown?(m[:ethnicity])}.all?
+        counts['unknown_ethnicity'] << columns_for_ethnicity_support(client)
       end
-      if unknown?(client[:race_none])
-        counts['unknown_race'] << columns_for_missing_support(client)
+      if alternate_clients.map{|m| unknown?(m[:race_none])}.all?
+        counts['unknown_race'] << columns_for_race_support(client)
       end
-      if unknown?(client[:gender])
-        counts['unknown_gender'] << columns_for_missing_support(client)
+      if alternate_clients.map{|m| unknown?(m[:gender])}.all?
+        counts['unknown_gender'] << columns_for_gender_support(client)
       end
       return counts
     end

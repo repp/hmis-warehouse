@@ -8,7 +8,7 @@ module EtoApi
     extend Memoist
     attr_accessor :trace
 
-    def initialize(trace: true, api_connection: 'dnd_eto')
+    def initialize(trace: false, api_connection: 'dnd_eto')
       @trace = trace
       @endpoints = {
         security: 'https://services.etosoftware.com/API/Security.svc',
@@ -19,7 +19,11 @@ module EtoApi
         staff: 'https://services.etosoftware.com/API/Staff.svc',
         activity: 'https://services.etosoftware.com/API/Activity.svc',
       }
-      api_config = YAML.load(ERB.new(File.read("#{Rails.root}/config/eto_api.yml")).result)[Rails.env]
+      begin
+        api_config = YAML.load(ERB.new(File.read("#{Rails.root}/config/eto_api.yml")).result)[Rails.env]
+      rescue
+        return false
+      end
       @credentials = {
         security: {
           'Email': api_config[api_connection]['email'],
@@ -50,7 +54,7 @@ module EtoApi
     end
 
     private def debug_log(msg)
-      puts msg if self.trace
+      puts msg.gsub(@credentials[:security]['Password'], '') if self.trace && Rails.env.development?
     end
 
     private def api_get_json(url, headers={})
@@ -76,8 +80,12 @@ module EtoApi
       body_text = body.to_json
       debug_log "=> POST #{url}"
       debug_log "   #{body_text}"
-
-      r = RestClient.post(url, body_text, headers.merge('Content-type' => 'application/json')) rescue '[]'
+      begin
+        r = RestClient.post(url, body_text, headers.merge('Content-type' => 'application/json'))
+      rescue Exception => e
+        debug_log "<= FAILED - ERROR #{e.message}"
+        return false
+      end
       debug_log "<= #{r.body}"
       JSON.parse(r.body)
     end

@@ -4,6 +4,7 @@ module Cohorts
     include ArelHelper
     include Chronic
     include CohortAuthorization
+    include CohortClients
 
 
     before_action :require_can_access_cohort!
@@ -24,11 +25,7 @@ module Cohorts
       respond_to do |format|
         format.json do
           if params[:content].present?
-            if params[:inactive].present?
-              @cohort_clients = @cohort.cohort_clients
-            else
-              @cohort_clients = @cohort.cohort_clients.where(active: true)
-            end
+            set_cohort_clients
             # Allow for individual refresh
             if params[:cohort_client_id].present?
               @cohort_clients = @cohort_clients.where(id: params[:cohort_client_id].to_i)
@@ -44,11 +41,7 @@ module Cohorts
           end
         end
         format.html do
-          if params[:inactive].present?
-            @cohort_clients = @cohort.cohort_clients
-          else
-            @cohort_clients = @cohort.cohort_clients.where(active: true)
-          end
+          set_cohort_clients
                     
           @cohort_clients = @cohort_clients.page(params[:page].to_i).per(params[:per].to_i)
           render layout: false
@@ -159,8 +152,8 @@ module Cohorts
           else
             @clients = @clients.where(wcp_t[:homeless_days].gteq(@actives[:min_days_homeless]))
           end
-          
-          if @actives[:actives_population].present?
+
+          if @actives.key? :actives_population
             population = @actives[:actives_population]
             # Force service to fall within the correct age ranges for some populations
             service_scope = :current_scope
@@ -170,15 +163,22 @@ module Cohorts
               service_scope = :children
             elsif population == 'parenting_youth'
               service_scope = :youth
+            elsif population == 'individual_adult'
+              service_scope = :adult
             end
 
             enrollment_scope = enrollment_scope.with_service_between(
               start_date: @actives[:start], 
               end_date: @actives[:end], 
               service_scope: service_scope
-            ).send(population)
+            )
+            if @actives[:actives_population].present?
+              enrollment_scope = enrollment_scope.send(population)
+            end
           end
-          @clients = @clients.where(enrollment_scope.exists)
+          # Active record seems to have trouble with the complicated nature of this scope
+          @clients = @clients.where("EXISTS(#{enrollment_scope.to_sql})")
+          
       elsif @client_ids.present?
         @client_ids = @client_ids.strip.split(/\s+/).map{|m| m[/\d+/].to_i}
         @clients = client_scope.where(id: @client_ids)
@@ -188,9 +188,10 @@ module Cohorts
       end
       counts = GrdaWarehouse::WarehouseClientsProcessed.
         where(client_id: @clients.select(:id)).
-        pluck(:client_id, :homeless_days, :days_homeless_last_three_years)
-      @days_homeless = counts.map{|client_id, days_homeless, _| [client_id, days_homeless]}.to_h
-      @days_homeless_three_years = counts.map{|client_id, _, days_homeless_last_three_years| [client_id, days_homeless_last_three_years]}.to_h
+        pluck(:client_id, :homeless_days, :days_homeless_last_three_years, :literally_homeless_last_three_years)
+      @days_homeless = counts.map{|client_id, days_homeless, _, _| [client_id, days_homeless]}.to_h
+      @days_homeless_three_years = counts.map{|client_id, _, days_homeless_last_three_years, _| [client_id, days_homeless_last_three_years]}.to_h
+      @days_literally_homeless_three_years = counts.map{|client_id, _, _, literally_homeless_last_three_years| [client_id, literally_homeless_last_three_years]}.to_h
       Rails.logger.info "CLIENTS: #{@clients.to_sql}"
       @clients = @clients.pluck(*client_columns).map do |row|
         Hash[client_columns.zip(row)]
@@ -210,13 +211,8 @@ module Cohorts
     end
 
     def create
-      if cohort_params[:client_ids].present?
-        cohort_params[:client_ids].split(',').map(&:strip).compact.each do |id|
-          create_cohort_client(@cohort.id, id.to_i)
-        end
-      elsif cohort_params[:client_id].present?
-        create_cohort_client(@cohort.id, cohort_params[:client_id].to_i)
-      end
+      client_ids = cohort_params[:client_ids]
+      RunCohortClientJob.perform_later(@cohort.id, client_ids, current_user.id)
       flash[:notice] = "Clients updated for #{@cohort.name}"
       respond_with(@cohort, location: cohort_path(@cohort))
     end
@@ -263,22 +259,6 @@ module Cohorts
         end        
       else
         render json: {alert: :danger, message: 'Unable to save change'}
-      end
-    end
-
-    def create_cohort_client(cohort_id, client_id)
-      ch = cohort_client_source.with_deleted.
-        where(cohort_id: cohort_id, client_id: client_id).first_or_initialize
-      ch.deleted_at = nil
-      cohort_source.available_columns.each do |column|
-        if column.has_default_value?
-          column.cohort = @cohort
-          ch[column.column] = column.default_value(client_id)
-        end
-      end
-      if ch.changed? || ch.new_record?
-        ch.save
-        log_create(cohort_id, ch.id)
       end
     end
 
@@ -386,6 +366,7 @@ module Cohorts
 
     # only clients who have at least one source client
     # that is visible in the window
+    # This is more strict than visible_in_window_to(user)
     def client_scope
       if @cohort.only_window
         client_source.destination.

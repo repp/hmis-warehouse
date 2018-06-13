@@ -97,9 +97,6 @@ gem 'exception_notification'
 gem 'puma', '~> 3.7.1'
 gem 'letsencrypt_plugin'
 
-# Use Capistrano for deployment
-# gem 'capistrano-rails', group: :development
-
 gem 'newrelic_rpm', require: false
 # gem "temping", require: false
 gem 'dotenv-rails'
@@ -141,7 +138,6 @@ group :development do
   gem 'capistrano-bundler'
   gem 'capistrano-rvm'
   gem 'capistrano-rails'
-  gem 'capistrano3-delayed-job', '~> 1.0'
   gem 'rails-erd'
   gem 'web-console'
   gem 'quiet_assets'
@@ -154,6 +150,7 @@ group :development do
   gem 'rack-mini-profiler', require: false
   gem 'flamegraph'
   gem 'stackprof'     # For Ruby MRI 2.1+
+  gem 'active_record_query_trace'
   # gem 'rb-readline'
 end
 
@@ -164,6 +161,8 @@ group :test do
   gem 'rspec-mocks'
   gem 'shoulda'
   gem 'timecop'
+  gem 'test_after_commit'
+  gem 'after_commit_exception_notification'
 end
 
 group :development, :staging do

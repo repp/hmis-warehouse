@@ -8,14 +8,15 @@ module CohortColumns
       [
         '', 
         'CoC', 
-        'ESG RRH', 
-        'Inactive', 
+        'ESG RRH',
         'Other - in notes', 
         'RRHHI', 
         'SSVF - NECHV', 
         'SSVF - VOA', 
         'VASH', 
-        'VWH'
+        'VWH',
+        'RRH',
+        'Safe Haven',
       ]
     end
   end

@@ -74,7 +74,7 @@ module GrdaWarehouse::Hud
     has_many :warehouse_client_destination, class_name: GrdaWarehouse::WarehouseClient.name, foreign_key: :destination_id, inverse_of: :destination
     has_one :destination_client, through: :warehouse_client_source, source: :destination, inverse_of: :source_clients
     has_many :source_clients, through: :warehouse_client_destination, source: :source, inverse_of: :destination_client
-    has_many :window_source_clients, -> {visible_in_window}, through: :warehouse_client_destination, source: :source, inverse_of: :destination_client
+    has_many :window_source_clients, through: :warehouse_client_destination, source: :source, inverse_of: :destination_client
 
     has_one :processed_service_history, -> { where(routine: 'service_history')}, class_name: 'GrdaWarehouse::WarehouseClientsProcessed'
     has_one :first_service_history, -> { where record_type: 'first' }, class_name: GrdaWarehouse::ServiceHistoryEnrollment.name
@@ -166,6 +166,8 @@ module GrdaWarehouse::Hud
     has_many :active_cohorts, -> do
       where(active_cohort: true)
     end, through: :active_cohort_clients, class_name: 'GrdaWarehouse::Cohort', source: :cohort
+
+    has_one :active_consent_form, class_name: GrdaWarehouse::ClientFile.name, primary_key: :consent_form_id, foreign_key: :id
 
     # Delegations
     delegate :first_homeless_date, to: :processed_service_history, allow_nil: true
@@ -293,10 +295,11 @@ module GrdaWarehouse::Hud
         as('sh_t')
       joins "INNER JOIN #{inner_table.to_sql} ON #{c_t[:id].eq(inner_table[:client_id]).to_sql}"
     end
-    scope :disabled, -> do
-      dt = Disability.arel_table
-      where Disability.where( dt[:data_source_id].eq c_t[:data_source_id] ).where( dt[:PersonalID].eq c_t[:PersonalID] ).exists
-    end
+    # scope :disabled, -> do
+    #   dt = Disability.arel_table
+    #   where Disability.where( dt[:data_source_id].eq c_t[:data_source_id] ).where( dt[:PersonalID].eq c_t[:PersonalID] ).exists
+    # end
+    # 
     # clients whose first residential service record is within the given date range
     scope :entered_in_range, -> (range) do
       s, e, exclude = range.first, range.last, range.exclude_end?   # the exclusion bit's a little pedantic...
@@ -344,8 +347,8 @@ module GrdaWarehouse::Hud
       where.not(hiv_positive: false)
     end
 
-    scope :visible_in_window, -> do
-      joins(:data_source).where(data_sources: {visible_in_window: true})
+    scope :visible_in_window_to, -> (user) do
+      joins(:data_source).merge(GrdaWarehouse::DataSource.visible_in_window_to(user))
     end
 
     scope :has_homeless_service_after_date, -> (date: 31.days.ago) do
@@ -480,9 +483,9 @@ module GrdaWarehouse::Hud
       names.join(',')
     end
 
-    def client_names window: true
+    def client_names window: true, user: nil
       client_scope = if window
-        source_clients.visible_in_window
+        source_clients.visible_in_window_to(user)
       else
         source_clients
       end
@@ -493,6 +496,76 @@ module GrdaWarehouse::Hud
           name: m.full_name,
         }
       end
+    end
+
+    def currently_disabled?
+      d_t1 = GrdaWarehouse::Hud::Disability.arel_table
+      d_t2 = Arel::Table.new(d_t1.table_name)
+      d_t2.table_alias = 'disability2'
+      c_t1 = GrdaWarehouse::Hud::Client.arel_table
+      c_t2 = Arel::Table.new(c_t1.table_name)
+      c_t2.table_alias = 'source_clients'
+      GrdaWarehouse::Hud::Client.destination.
+        where(id: id).
+        joins(:source_enrollment_disabilities).
+        where(Disabilities: {DisabilityType: [5, 6, 7, 8, 9, 10], DisabilityResponse: [1, 2, 3]}).
+        where(
+          d_t2.project(Arel.star).where(
+            d_t2[:DateDeleted].eq(nil)
+          ).where(
+            d_t2[:DisabilityType].eq(d_t1[:DisabilityType])
+          ).where(
+            d_t2[:InformationDate].gt(d_t1[:InformationDate])
+          ).join(e_t).on(
+            e_t[:PersonalID].eq(d_t2[:PersonalID]).
+            and(e_t[:data_source_id].eq(d_t2[:data_source_id])).
+            and(e_t[:ProjectEntryID].eq(d_t2[:ProjectEntryID])).
+            and(e_t[:DateDeleted].eq(nil))
+          ).join(c_t2).on(
+             e_t[:PersonalID].eq(c_t2[:PersonalID]).
+             and(e_t[:data_source_id].eq(c_t2[:data_source_id]))
+          ).join(wc_t).on(
+            c_t2[:id].eq(wc_t[:source_id]).
+            and(wc_t[:deleted_at].eq(nil))
+          ).where(
+            wc_t[:destination_id].eq(c_t1[:id])
+          ).
+          exists.not 
+        ).distinct.exists?
+    end
+
+    def self.disabled_client_ids
+      d_t1 = GrdaWarehouse::Hud::Disability.arel_table
+      d_t2 = Arel::Table.new(d_t1.table_name)
+      d_t2.table_alias = 'disability2'
+      c_t1 = GrdaWarehouse::Hud::Client.arel_table
+      c_t2 = Arel::Table.new(c_t1.table_name)
+      c_t2.table_alias = 'source_clients'
+      GrdaWarehouse::Hud::Client.destination.joins(:source_enrollment_disabilities).
+        where(Disabilities: {DisabilityType: [5, 6, 7, 8, 9, 10], DisabilityResponse: [1, 2, 3]}).
+        where(
+          d_t2.project(Arel.star).where(
+            d_t2[:DateDeleted].eq(nil)
+          ).where(
+            d_t2[:DisabilityType].eq(d_t1[:DisabilityType])
+          ).where(
+            d_t2[:InformationDate].gt(d_t1[:InformationDate])
+          ).join(e_t).on(
+            e_t[:PersonalID].eq(d_t2[:PersonalID]).
+            and(e_t[:data_source_id].eq(d_t2[:data_source_id])).
+            and(e_t[:ProjectEntryID].eq(d_t2[:ProjectEntryID])).
+            and(e_t[:DateDeleted].eq(nil))
+          ).join(c_t2).on(
+             e_t[:PersonalID].eq(c_t2[:PersonalID]).
+             and(e_t[:data_source_id].eq(c_t2[:data_source_id]))
+          ).join(wc_t).on(
+            c_t2[:id].eq(wc_t[:source_id]).
+            and(wc_t[:deleted_at].eq(nil))
+          ).where(
+            wc_t[:destination_id].eq(c_t1[:id])
+          ).
+          exists.not 
+        ).distinct.pluck(:id)
     end
 
     def deceased?
@@ -586,8 +659,6 @@ module GrdaWarehouse::Hud
       end
     end
 
-    # Some file tags represent client attributes, 
-    # Never trigger the full-release with just a file
     def sync_cas_attributes_with_files
       return unless GrdaWarehouse::Config.get(:cas_flag_method) == 'file'
       self.ha_eligible = client_files.tagged_with(cas_attributes_file_tag_map[:ha_eligible], any: true).exists?
@@ -598,15 +669,6 @@ module GrdaWarehouse::Hud
           pluck(:updated_at).first
       else
         self.disability_verified_on = nil
-      end
-      # Only convert blank to limited cas and limited to blank, full has been 
-      # confirmed by a human
-      if self.housing_release_status != self.class.full_release_string
-        if client_files.tagged_with(cas_attributes_file_tag_map[:limited_cas_release], any: true).exists?
-          self.housing_release_status = self.class.partial_release_string
-        else
-          self.housing_release_status = nil
-        end
       end
       save
     end
@@ -624,6 +686,14 @@ module GrdaWarehouse::Hud
           'Limited CAS Release'
         ],
       }
+    end
+
+    def contact_info_for_rrh_assessment
+      rrh_assessment_contact_info if consent_form_valid?
+    end
+
+    def score_for_rrh_assessment
+      rrh_assessment_score || 0
     end
 
     ##############################
@@ -681,13 +751,29 @@ module GrdaWarehouse::Hud
       ).first&.consent_form_confirmed
     end
 
-    def active_consent_form
-      client_files.consent_forms.confirmed.order(effective_date: :desc)&.first
-    end
-
     def newest_consent_form
       # Regardless of confirmation status
       client_files.consent_forms.order(updated_at: :desc)&.first 
+    end
+
+    def release_status_for_cas
+      if housing_release_status.blank?
+        return 'None on file'
+      end
+      if release_duration == 'One Year'
+        if ! (consent_form_valid? && consent_confirmed?)
+          return 'Expired'
+        end
+      end
+      return _(housing_release_status)
+    end
+
+    def invalidate_consent!
+      update_columns(
+        consent_form_id: nil,
+        housing_release_status: nil,
+        consent_form_signed_on: nil
+      )
     end
 
     # End Release information
@@ -1046,6 +1132,16 @@ module GrdaWarehouse::Hud
         congregate_housing: _('Willing to live in congregate housing'),
         sober_housing: _('Appropriate for sober supportive housing')
       }
+    end
+
+    def self.manual_cas_columns
+      cas_columns.except(:hiv_positive, :dmh_eligible, :chronically_homeless_for_cas, :full_housing_release, :limited_cas_release, :housing_release_status, :sync_with_cas, :hues_eligible, :disability_verified_on).
+        keys
+    end
+
+    def self.file_cas_columns
+      cas_columns.except(:hiv_positive, :dmh_eligible, :chronically_homeless_for_cas, :full_housing_release, :limited_cas_release, :housing_release_status, :sync_with_cas, :hues_eligible, :disability_verified_on, :ha_eligible).
+        keys
     end
 
     def self.housing_release_options
@@ -1600,7 +1696,16 @@ module GrdaWarehouse::Hud
       self.class.days_homeless_in_last_three_years(client_id: id, on_date: on_date)
     end
 
-    def self.dates_homeless_scope(client_id:, on_date: Date.today)
+    def self.literally_homeless_last_three_years(client_id:, on_date: Date.today)
+      dates_literally_homeless_in_last_three_years_scope(client_id: client_id, on_date: on_date).count
+    end
+
+    def literally_homeless_last_three_years(on_date: Date.today)
+      self.class.literally_homeless_last_three_years(client_id: id, on_date: on_date)
+    end
+
+
+    def self.dates_homeless_scope client_id:, on_date: Date.today 
       GrdaWarehouse::ServiceHistoryService.where(client_id: client_id).
         homeless.
         where(shs_t[:date].lteq(on_date)).
@@ -1608,7 +1713,7 @@ module GrdaWarehouse::Hud
         select(:date).distinct
     end
 
-    def self.dates_in_hud_chronic_homeless_last_three_years_scope(client_id:, on_date: Date.today, chronic_only: true)
+    def self.dates_in_hud_chronic_homeless_last_three_years_scope client_id:, on_date: Date.today, chronic_only: true
       Rails.cache.fetch([client_id, "dates_in_hud_chronic_homeless_last_three_years_scope", on_date], expires_at: CACHE_EXPIRY) do
         end_date = on_date.to_date
         start_date = end_date - 3.years
@@ -1621,29 +1726,60 @@ module GrdaWarehouse::Hud
       end
     end
 
-    def self.dates_homeless_in_last_three_years_scope(client_id:, on_date: Date.today)
+    # ES, SO, SH, or TH with no overlapping PH
+    def self.dates_homeless_in_last_three_years_scope client_id:, on_date: Date.today
       Rails.cache.fetch([client_id, "dates_homeless_in_last_three_years_scope", on_date], expires_at: CACHE_EXPIRY) do
         end_date = on_date.to_date
         start_date = end_date - 3.years
         GrdaWarehouse::ServiceHistoryService.where(client_id: client_id).
           homeless.
           where(date: start_date..end_date).
-          where.not(date: dates_hud_non_chronic_residential_scope(client_id: client_id)).
+          where.not(date: dates_in_ph_last_three_years_scope(client_id: client_id, on_date: on_date)).
           select(:date).distinct
       end
     end
 
-    def self.dates_hud_non_chronic_residential_last_three_years_scope client_id:, on_date:
+    # ES, SO, or SH with no overlapping TH or PH
+    def self.dates_literally_homeless_in_last_three_years_scope client_id:, on_date: Date.today
+      Rails.cache.fetch([client_id, "dates_literally_homeless_in_last_three_years_scope", on_date], expires_at: CACHE_EXPIRY) do
+        end_date = on_date.to_date
+        start_date = end_date - 3.years
+        GrdaWarehouse::ServiceHistoryService.where(client_id: client_id).
+          homeless.
+          where(date: start_date..end_date).
+          where.not(date: dates_hud_non_chronic_residential_last_three_years_scope(client_id: client_id)).
+          select(:date).distinct
+      end
+    end
+
+    # TH or PH
+    def self.dates_hud_non_chronic_residential_last_three_years_scope client_id:, on_date: Date.today
       end_date = on_date.to_date
       start_date = end_date - 3.years
+
+      dates_hud_non_chronic_residential_scope(client_id: client_id).
+        where(date: start_date..end_date)
+    end
+
+    # TH or PH
+    def self.dates_hud_non_chronic_residential_scope client_id:
       GrdaWarehouse::ServiceHistoryService.hud_residential_non_homeless.
-        where(date: start_date..end_date).
-        where(client_id: client_id).
+      where(client_id: client_id).
         select(:date).distinct
     end
 
-    def self.dates_hud_non_chronic_residential_scope client_id:
-      GrdaWarehouse::ServiceHistoryService.hud_residential_non_homeless.
+    # PH
+    def self.dates_in_ph_last_three_years_scope client_id:, on_date:
+      end_date = on_date.to_date
+      start_date = end_date - 3.years
+
+      dates_in_ph_residential_scope(client_id: client_id).
+        where(date: start_date..end_date)
+    end
+
+    # PH
+    def self.dates_in_ph_residential_scope client_id:
+      GrdaWarehouse::ServiceHistoryService.residential_non_homeless.
       where(client_id: client_id).
         select(:date).distinct
     end
@@ -1818,6 +1954,23 @@ module GrdaWarehouse::Hud
 
     def ongoing_enrolled_project_ids
       service_history_enrollments.ongoing.joins(:project).distinct.pluck(p_t[:id].to_sql)
+    end
+
+    def ongoing_enrolled_project_types
+      @ongoing_enrolled_project_types ||= service_history_enrollments.ongoing.distinct.pluck(GrdaWarehouse::ServiceHistoryEnrollment.project_type_column)
+    end
+
+    def enrolled_in_th
+     (GrdaWarehouse::Hud::Project::RESIDENTIAL_PROJECT_TYPES[:th] & ongoing_enrolled_project_types).present?
+    end
+    def enrolled_in_sh
+      (GrdaWarehouse::Hud::Project::RESIDENTIAL_PROJECT_TYPES[:sh] & ongoing_enrolled_project_types).present?
+    end
+    def enrolled_in_so
+      (GrdaWarehouse::Hud::Project::RESIDENTIAL_PROJECT_TYPES[:so] & ongoing_enrolled_project_types).present?
+    end
+    def enrolled_in_es
+      (GrdaWarehouse::Hud::Project::RESIDENTIAL_PROJECT_TYPES[:es] & ongoing_enrolled_project_types).present?
     end
 
     def enrollments_for_rollup en_scope: scope, include_confidential_names: false, only_ongoing: false

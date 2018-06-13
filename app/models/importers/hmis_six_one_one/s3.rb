@@ -34,7 +34,8 @@ module Importers::HMISSixOneOne
     end
 
     def self.available_connections
-      YAML::load(ERB.new(File.read(Rails.root.join("config","hmis_s3.yml"))).result)[Rails.env]
+      connections = YAML::load(ERB.new(File.read(Rails.root.join("config","hmis_s3.yml"))).result)[Rails.env]
+      connections.select{|_,conn| conn['access_key_id'].present?}
     end
         
     def import!
@@ -72,7 +73,7 @@ module Importers::HMISSixOneOne
     end
       
     def force_standard_zip file
-      puts file.inspect
+      # puts file.inspect
       file_path = "#{Rails.root.to_s}/#{file}"
       if File.extname(file_path) == '.7z'
         dest_file = file.gsub('.7z', '.zip')

@@ -9,6 +9,7 @@ set :whenever_identifier, ->{ "#{fetch(:application)}_#{fetch(:stage)}" }
 set :cron_user, ENV.fetch('CRON_USER') { 'ubuntu'}
 set :whenever_roles, [:cron, :production_cron, :staging_cron]
 set :whenever_command, -> { "bash -l -c 'cd #{fetch(:release_path)} && /usr/local/rvm/bin/rvmsudo ./bin/bundle exec whenever -u #{fetch(:cron_user)} --update-crontab #{fetch(:whenever_identifier)} --set \"environment=#{fetch(:rails_env)}\" '" }
+set :passenger_restart_command, 'sudo passenger-config restart-app'
 
 if !ENV['FORCE_SSH_KEY'].nil?
   set :ssh_options, {
@@ -25,15 +26,8 @@ else
   }
 end
 
-if ENV['DELAYED_JOB_SYSTEMD']=='true'
-  unless ENV['SKIP_JOBS']=='true'
-    # Only need the app for its db structure no server running
-    #after 'passenger:restart', 'delayed_job:restart'
-  end
-else
-  set :delayed_job_prefix, "#{ENV['CLIENT']}-hmis"
-  set :delayed_job_roles, [:job]
-  set :delayed_job_pools, { low_priority: 4, default_priority: 2, high_priority: 2, nil => 1}
+unless ENV['SKIP_JOBS']=='true'
+  after 'passenger:restart', 'delayed_job:restart'
 end
 
 set :ssh_port, ENV.fetch('SSH_PORT') { '22' }
@@ -49,8 +43,9 @@ task :group_writable do
     execute "chgrp --quiet ubuntu -R #{fetch(:deploy_to)} || echo ok"
   end
 end
-# Only need the app for its db structure no server running
-#after 'passenger:restart', :group_writable
+after 'passenger:restart', :group_writable
+after 'deploy:log_revision', :group_writable
+
 
 # Default branch is :master
 # ask :branch, `git rev-parse --abbrev-ref HEAD`.chomp
@@ -81,11 +76,8 @@ set :linked_files, fetch(:linked_files, []).push(
 # Default value for linked_dirs is []
 set :linked_dirs, fetch(:linked_dirs, []).push(
   'log',
-  'tmp/pids',
-  'tmp/cache',
-  'tmp/client_images',
+  'tmp',
   'public/system',
-  'tmp/sockets',
   'var',
   'app/assets/stylesheets/theme/styles',
   'app/assets/images/theme/logo',

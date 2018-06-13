@@ -15,6 +15,10 @@ module GrdaWarehouse::HMIS
     scope :window, -> do
       active.where(exclude_from_window: false)
     end
+    scope :window_with_details, -> do
+      window.where(details_in_window_with_release: true)
+    end
+
     scope :active, -> do
       where(active: true)
     end
@@ -120,7 +124,7 @@ module GrdaWarehouse::HMIS
       touch_points = {}
       api_config.each do |connection_key, config|
         data_source_id = config['data_source_id']
-        api = EtoApi::Base.new(trace: true, api_connection: connection_key)
+        api = EtoApi::Base.new(trace: false, api_connection: connection_key)
         api.connect
         api.sites.each do |site_id, name|
           touch_points.merge!(hud_touch_point(site_id: site_id, data_source_id: data_source_id, site_name: name))
