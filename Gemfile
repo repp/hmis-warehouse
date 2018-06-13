@@ -138,6 +138,7 @@ group :development do
   gem 'capistrano-bundler'
   gem 'capistrano-rvm'
   gem 'capistrano-rails'
+  gem 'capistrano3-puma'
   gem 'rails-erd'
   gem 'web-console'
   gem 'quiet_assets'
