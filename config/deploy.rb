@@ -33,7 +33,7 @@ unless ENV['SKIP_JOBS']=='true'
   set :delayed_job_workers, 2
   set :delayed_job_prefix, "#{ENV['CLIENT']}-hmis-warehouse"
   set :delayed_job_roles, [:job]
-  #after 'puma:restart', 'delayed_job:restart'
+  after 'puma:restart', 'delayed_job:restart'
 end
 
 set :ssh_port, ENV.fetch('SSH_PORT') { '22' }
