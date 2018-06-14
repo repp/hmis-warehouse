@@ -30,7 +30,10 @@ set :nginx_ssl_certificate_key, "/var/www/slc-hmis-staging/current/certificates/
 set :nginx_use_ssl, true
 
 unless ENV['SKIP_JOBS']=='true'
-  after 'puma:restart', 'delayed_job:restart'
+  set :delayed_job_workers, 2
+  set :delayed_job_prefix, "#{ENV['CLIENT']}-hmis-warehouse"
+  set :delayed_job_roles, [:job]
+  #after 'puma:restart', 'delayed_job:restart'
 end
 
 set :ssh_port, ENV.fetch('SSH_PORT') { '22' }
