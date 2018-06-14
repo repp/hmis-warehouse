@@ -25,11 +25,11 @@
         .site-name.d-flex
           .o-header--page__title.site-title
             = link_to root_path do
-              = _('Boston DND Warehouse')
+              = _('Salt Lake County DND Warehouse')
               - unless Rails.env.production?
                 %span.mt-2{style: 'font-size:12px;'}= "[#{Rails.env}]"
         .o-header--page__sub-title.tagline
-          = _('Ending Veteran & Chronic Homelessness in Boston')
+          = _('Ending Veteran & Chronic Homelessness in Salt Lake County')
         = render 'layouts/header_nav'
 
     .l-main__wrapper
@@ -54,7 +54,7 @@
         .d-flex.flex-column.align-items-center
           = render 'layouts/footer_seal'
           %p
-            = _('The Boston DND Warehouse is operated by the Department of Neighborhood Development as the lead agency of the Boston Continuum of Care.')
+            = _('The Salt Lake County DND Warehouse is operated by the Housing Authority of the County of Salt Lake.')
 
     #d3-tooltip
     = render 'pjax_modal_frame'

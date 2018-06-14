@@ -1,12 +1,12 @@
 - if lookup_context.exists?('homepage_content', ['root'], true)
   = render 'root/homepage_content'
 - else 
-  - title = _('Boston DND Warehouse')
+  - title = _('Salt Lake County DND Warehouse')
   - content_for :title, title
   %h1= content_for :title
   .row 
     .col-sm-7
       %p.home-intro
-        = _('Boston DND Warehouse')
+        = _('Salt Lake County DND Warehouse')
     .col-sm-5
       
