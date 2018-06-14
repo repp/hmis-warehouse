@@ -118,6 +118,15 @@ namespace :grda_warehouse do
     end
   end
 
+
+  desc "Seed Destination Data Source"
+  task seed_destination_data_source: [:environment] do
+    dnd_warehouse = GrdaWarehouse::DataSource.where(name: 'HMIS Warehouse').first_or_create
+    dnd_warehouse.short_name = 'Warehouse'
+    dnd_warehouse.save
+  end
+
+
   desc "Import Many HUD CSVs for development"
   task import_dev_hud_csvs: [:environment, "log:info_to_stdout"] do
     # FIXME: this no longer works with the new importer, we need a new exporter first
