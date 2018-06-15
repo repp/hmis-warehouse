@@ -20,7 +20,7 @@ Dotenv.load('.env', '.env.local')
 # end
 
 # Learn more: http://github.com/javan/whenever
-if environment == 'production'
+if environment == 'production' or environment == 'staging'
 
   # All installs get these
   daily_schedule = ENV['DAILY_SCHEDULE'] || '3:10 am'
